@@ -1,0 +1,61 @@
+{
+  "id": "live3d",
+  "name": "Live3D",
+  "nameEn": "Live3D",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "description": "在 Tangu 聊天右侧的 Agent Desk 里放一个 3D 形象(VRM 0.x / 1.0、GLB、glTF、FBX、OBJ),跟着 Agent 的状态做反应:思考时抬眼琢磨,说话时口型随输出一张一合,调工具时低头干活,等你回应时蹦一下,出错时垂头,完成时庆祝。两种显示模式:空闲显示(Desk 上没有文件时出现)与总是显示(完全替换 Desk 的文件展示)。常见格式直接导入,插件自动分析并生成配置;PMX、压缩包、压缩过的模型交给随包的 Live3D Importer Agent 协助转换。没导入模型时显示一个会做表情的小球。全部离线渲染。暂不支持 Live2D(授权原因)。",
+  "descriptionEn": "Puts a 3D avatar (VRM 0.x / 1.0, GLB, glTF, FBX, OBJ) on the Agent Desk to the right of the Tangu chat and makes it react to the agent: it looks up while thinking, its mouth follows the answer as it streams, it looks down at work while a tool runs, hops when it needs you, droops on errors and celebrates when a run finishes. Two display modes: when idle (appears while the Desk has no files) and always (completely replaces the Desk's file presentation). Common formats import directly and get an automatic profile; PMX, archives and compressed models go to the bundled Live3D Importer agent for conversion. Until you import a model, a friendly orb reacts instead. Renders fully offline. Live2D is not supported yet (licence).",
+  "main": "main.js",
+  "onboarding": {
+    "intro": "Live3D 让 Agent Desk 上多一个会看、会说、会干活的 3D 形象 —— Agent 在想、在说、在跑工具、在等你,它都演给你看。",
+    "steps": [
+      {
+        "title": "选显示模式",
+        "description": "设置 → 插件 → Live3D。「空闲显示」只在 Desk 上没有文件时出现,Agent 展示文件时让位,点 Desk 上的「清空 Desk」请回来;「总是显示」会完全替换 Agent Desk 的文件展示,Agent 展示的文件改为在新标签页打开。"
+      },
+      {
+        "title": "导入一个模型",
+        "description": "点「导入模型…」选 .vrm / .glb / .gltf / .fbx / .obj(贴图、.bin、.vrma 动作一起选),或用「导入文件夹…」。插件把文件复制进工作文件夹、做一次体检、自动生成配置,并设为 Desk 形象。"
+      },
+      {
+        "title": "格式不对?交给 Agent",
+        "description": "PMX、压缩包、Draco 压缩的模型不能直接显示:点「让 Agent 协助导入…」,插件会开一个与 Live3D Importer 的对话,它识别、转换并写好 live3d.json,形象随即自动载入。"
+      },
+      {
+        "title": "在模型库里试一试",
+        "description": "命令面板「Live3D:打开模型库」:预览可以拖着转、滚轮缩放,七种状态逐个试,一键设为 Desk 形象;也可以直接把文件拖进来导入。"
+      },
+      {
+        "title": "按自己的口味微调",
+        "description": "每个模型文件夹里的 live3d.json 可以手改(动作映射、表情、口型、构图),保存即生效;改坏了模型库会原样列出错误原因。"
+      }
+    ],
+    "en": {
+      "intro": "Live3D adds a 3D avatar to the Agent Desk that looks, talks and works along with the agent — thinking, answering, running tools or waiting for you, it acts it out.",
+      "steps": [
+        {
+          "title": "Pick a display mode",
+          "description": "Settings → Plugins → Live3D. \"When idle\" appears only while the Desk has no files, steps aside when the agent presents one, and comes back when you click \"Clear Desk\". \"Always\" completely replaces the Agent Desk file presentation, and files the agent presents open in a new tab instead."
+        },
+        {
+          "title": "Import a model",
+          "description": "Click \"Import model…\" and pick a .vrm / .glb / .gltf / .fbx / .obj together with its textures, .bin files and .vrma motions, or use \"Import folder…\". The plugin copies the files into its work folder, analyzes the model, writes a profile and puts it on the Desk."
+        },
+        {
+          "title": "Wrong format? Hand it to the agent",
+          "description": "PMX, archives and Draco-compressed models cannot be shown directly. Click \"Agent-assisted import…\" and the plugin opens a chat with Live3D Importer, which identifies and converts the model and writes live3d.json; the avatar then loads automatically."
+        },
+        {
+          "title": "Try it in the library",
+          "description": "Command palette → \"Live3D: Open model library\": drag to turn the preview, scroll to zoom, try all seven states and put a model on the Desk with one click. You can also drop files there to import them."
+        },
+        {
+          "title": "Fine-tune it",
+          "description": "Each model folder has a live3d.json you can edit (clip mapping, expressions, lip sync, framing); it reloads on save, and if something is wrong the library shows the exact reason."
+        }
+      ]
+    },
+    "settings": true
+  }
+}

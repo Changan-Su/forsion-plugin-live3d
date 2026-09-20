@@ -1,0 +1,29 @@
+{
+  "name": "forsion-plugin-live3d",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Forsion Live3D:Agent Desk 里的 3D 陪伴形象(构建源;产物 main.js 已提交)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node check.mjs",
+    "typecheck": "tsc --noEmit",
+    "unit": "node scripts/unit.mjs",
+    "smoke": "node scripts/render-smoke.mjs",
+    "verify": "npm run typecheck && npm run build && npm run check",
+    "smoke:shell": "node scripts/shell-smoke.mjs",
+    "live:agent": "node scripts/live-agent.mjs",
+    "icon": "node scripts/make-icon.mjs icon.png"
+  },
+  "dependencies": {
+    "@moeru/three-mmd": "0.2.0-beta.2",
+    "@pixiv/three-vrm": "3.5.5",
+    "@pixiv/three-vrm-animation": "3.5.5",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- render-smoke.mjs 把这一行换成桌面端 CSP(frontend/index.html)+ 本机静态服务器的来源。 -->
+    <!--CSP-->
+    <title>Live3D render smoke</title>
+    <style>
+      html, body { margin: 0; font: 12px/1.4 system-ui, sans-serif; }
+      body { background: #f4f1ea; color: #222; padding: 16px; }
+      .row { display: flex; gap: 24px; align-items: flex-start; }
+      /* 仿 Desk 卡片:外框 280×394 视觉像素、圆角裁切;正文 zoom:0.75 + pointer-events:none(desk.md §d)。 */
+      .card { width: 280px; height: 394px; border-radius: 20px; overflow: hidden; background: #fbfaf7; border: 1px solid #0001; }
+      .card-body { zoom: 0.75; width: calc(280px / 0.75); height: calc(394px / 0.75); position: relative; pointer-events: none; }
+      /* 仿展开侧板:深色背景,验证小球 / 模型在深浅两种底上都立得住。 */
+      .panel { width: 640px; height: 820px; position: relative; background: #1e1f22; border-radius: 12px; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="card" id="card"><div class="card-body" id="card-body"></div></div>
+      <div class="panel" id="panel"></div>
+    </div>
+    <script src="/live3d-smoke.js"></script>
+  </body>
+</html>
