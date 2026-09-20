@@ -1,13 +1,6 @@
 # Changelog
 
-## 未发布 / Unreleased
-
-- **形象可以按 Agent 绑定**:在模型库里勾选 Agent(写进该模型 `live3d.json` 的 `agents`),跟它们对话时 Desk 显示这个形象,其余对话显示「Desk 默认形象」。需要新版宿主提供会话归属(旧宿主上只显示默认形象)。
-  Companions can be bound to agents: tick them in the library (this writes `agents` in the model's own profile). Chats with those agents show that companion; every other chat shows the default one. Needs a host that reports which agent a session belongs to; on older hosts only the default companion is used.
-- **待机姿势可调**:没有动作片段的模型(MMD、多数 VRoid 导出)由插件自己摆手臂与躯干。缺省姿势重做 —— 手臂略微外张前摆、手肘微弯、两侧缓慢漂移,不再像挂在衣架上,手也不会陷进裙摆。`live3d.json` 新增 `pose`(`armSpread` / `armForward` / `elbow` / `liveliness`),模型库有四个滑块,也可以直接让 Agent 看着截图帮你调。有片段驱动的骨骼仍由片段说了算。
-  Tunable idle pose for models with no clips: new defaults (arms slightly out and forward, elbows bent, each side drifting on its own period) plus a `pose` block, four sliders in the library, and a skill an agent can follow to tune it from a screenshot. Clips still win over `pose` on the bones they drive.
-
-## 0.1.0 — 2026-09-19
+## 0.1.0 — 2026-09-20
 
 首个版本 / First release.
 
@@ -21,8 +14,12 @@
   Bundled "Live3D Importer" agent, opened as a visible chat via ctx.tangu.startChat; the avatar loads as soon as its profile is written.
 - 全局技能 live3d-import(包根 skills/):任何 Agent(包括用户自建的)都能在普通聊天里接一个文件 / 压缩包路径完成导入,再到模型库「设为 Desk 形象」。
   Global skill live3d-import (bundle-root skills/): any agent, including user-created ones, can import from a pasted file or archive path; then pick the model in the library and press "Use on the Desk".
+- **形象可以按 Agent 绑定**:在模型库里勾选 Agent(写进该模型 `live3d.json` 的 `agents`),跟它们对话时 Desk 显示这个形象,其余对话显示「Desk 默认形象」。一个 Agent 被两个形象绑住时按文件夹名字母序取第一个。
+  Companions can be bound to agents: tick them in the library (this writes `agents` in the model's own profile). Chats with those agents show that companion; every other chat shows the default one. If two models claim the same agent, the one whose folder name sorts first wins.
+- **待机姿势可调**:没有动作片段的模型(MMD、多数 VRoid 导出)由插件自己摆手臂与躯干。缺省姿势重做 —— 手臂略微外张前摆、手肘微弯、两侧缓慢漂移,不再像挂在衣架上,手也不会陷进裙摆。`live3d.json` 新增 `pose`(`armSpread` / `armForward` / `elbow` / `liveliness`),模型库有四个滑块,也可以直接让 Agent 看着截图帮你调。有片段驱动的骨骼仍由片段说了算。
+  Tunable idle pose for models with no clips: new defaults (arms slightly out and forward, elbows bent, each side drifting on its own period) plus a `pose` block, four sliders in the library, and a skill an agent can follow to tune it from a screenshot. Clips still win over `pose` on the bones they drive.
 - 暂不支持 Live2D(授权原因),保留渲染器扩展点。
   Live2D is not supported (licence); a renderer extension point is kept.
 
-⚠️ manifest 暂未写 `minAppVersion`:本插件依赖 `ctx.desk` / `ctx.tangu.startChat` / `ctx.app.writeBytes`(2026-09-19 起的宿主接缝)。**发版前必须钉到第一个带 `ctx.desk` 的宿主版本**;在那之前旧宿主上 Desk 里不出现形象(设置页会说明),模型库与导入照常。
-Note: `minAppVersion` is intentionally unset for now. Pin it to the first host release that ships `ctx.desk` before publishing.
+⚠️ `minAppVersion` 钉在 **2.12.0**:本插件依赖 `ctx.desk`(Agent Desk 伴随面)、`ctx.tangu.startChat`、`ctx.app.writeBytes`,按 Agent 绑定还要 `ctx.tangu.agents` 与状态接缝里的会话归属 —— 这批宿主接缝截至 Forsion 2.11.1 都尚未发版。更早的宿主会按 `minAppVersion` 把插件挡下并说明要哪个版本,不会装上去静默不工作。宿主发版时若不是 2.12.0,改这一行并重打 release。
+`minAppVersion` is pinned to **2.12.0**: the plugin needs `ctx.desk` (the Agent Desk companion seam), `ctx.tangu.startChat` and `ctx.app.writeBytes`, and per-agent binding additionally needs `ctx.tangu.agents` and the session's agent on the status seam — none of which had shipped as of host 2.11.1. Older hosts block the plugin and name the version they need instead of installing something that silently does nothing.

@@ -2,7 +2,7 @@
  * 自检:`node check.mjs`(install.sh 装包前必跑;非 0 退出 = 不装)。只依赖本仓(node 内置 + 已装的 esbuild)。
  *
  *  1. **构建产物**能过宿主的装载闸:顶层无 import/export、可被 new Function('ctx', …) 构造、footer 把 dispose return 出去。
- *  2. **版本 / manifest**:manifest = package.json = CHANGELOG 顶节;onboarding 上限与中英步数;没有 minAppVersion(见 CHANGELOG)。
+ *  2. **版本 / manifest**:manifest = package.json = CHANGELOG 顶节;onboarding 上限与中英步数;minAppVersion 钉住带 ctx.desk 的宿主版本。
  *  3. **裸 ctx 装载(老宿主)不抛 + 负对照**:把 `.desk?.` / `.tangu?.` / `.writeBytes?.` 逐条拆成非可选链,裸 ctx 上必须当场抛
  *     —— 证明上一条不是恒绿。
  *  4. **全量 ctx 装载**:伴随面 / 视图 / 设置面 / 5 条带前缀、无热键的命令都注册上;挂载与卸载不抛;切模式会 handle.update;
@@ -73,15 +73,16 @@ await t('版本一致:manifest = package.json = CHANGELOG 顶节', () => {
   const top = /^## (\d+\.\d+\.\d+)/m.exec(changelog)?.[1]
   A.equal(top, manifest.version, `CHANGELOG 顶节是 ${top}`)
 })
-await t('manifest 基本面:id / 名称 / apiVersion / main;没有 minAppVersion(发版前再钉,见 CHANGELOG)', () => {
+await t('manifest 基本面:id / 名称 / apiVersion / main;minAppVersion 钉住带 ctx.desk 的宿主版本', () => {
   A.equal(manifest.id, 'live3d')
   A.match(manifest.id, /^[a-z0-9][a-z0-9-]{0,63}$/)
   A.equal(manifest.name, 'Live3D')
   A.equal(manifest.nameEn, 'Live3D')
   A.equal(manifest.apiVersion, 1)
   A.equal(manifest.main, 'main.js')
-  A.ok(!('minAppVersion' in manifest), 'minAppVersion 现在钉未来版本会把 dev 宿主挡掉')
-  A.match(changelog, /minAppVersion/, 'CHANGELOG 要写明发版前必须钉 minAppVersion')
+  // 不钉 = 旧宿主上装得进去、Desk 里却什么都不出现(静默空操作);钉住则由宿主挡下并说明要哪个版本
+  A.equal(manifest.minAppVersion, '2.12.0', 'minAppVersion 要钉到第一个带 ctx.desk / ctx.tangu.agents 的宿主版本')
+  A.match(changelog, /minAppVersion` 钉在/, 'CHANGELOG 要写明 minAppVersion 钉在哪个宿主版本')
   A.ok(manifest.description && manifest.descriptionEn, '缺 description / descriptionEn')
 })
 await t('onboarding:intro ≤500、步骤 ≤8、标题 ≤120、说明 ≤500,中英步数一致,settings:true,不推荐自家 Agent', () => {
