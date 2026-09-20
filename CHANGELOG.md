@@ -21,5 +21,5 @@
 - 暂不支持 Live2D(授权原因),保留渲染器扩展点。
   Live2D is not supported (licence); a renderer extension point is kept.
 
-⚠️ `minAppVersion` 钉在 **2.12.0**:本插件依赖 `ctx.desk`(Agent Desk 伴随面)、`ctx.tangu.startChat`、`ctx.app.writeBytes`,按 Agent 绑定还要 `ctx.tangu.agents` 与状态接缝里的会话归属 —— 这批宿主接缝截至 Forsion 2.11.1 都尚未发版。更早的宿主会按 `minAppVersion` 把插件挡下并说明要哪个版本,不会装上去静默不工作。宿主发版时若不是 2.12.0,改这一行并重打 release。
-`minAppVersion` is pinned to **2.12.0**: the plugin needs `ctx.desk` (the Agent Desk companion seam), `ctx.tangu.startChat` and `ctx.app.writeBytes`, and per-agent binding additionally needs `ctx.tangu.agents` and the session's agent on the status seam — none of which had shipped as of host 2.11.1. Older hosts block the plugin and name the version they need instead of installing something that silently does nothing.
+⚠️ `minAppVersion` 钉在 **2.11.2**:本插件依赖 `ctx.desk`(Agent Desk 伴随面)、`ctx.tangu.startChat`、`ctx.app.writeBytes`,按 Agent 绑定还要 `ctx.tangu.agents` 与状态接缝里的会话归属 —— 这批宿主接缝随 Forsion 2.11.2 一起发,2.11.1 及更早都还没有。更早的宿主会按 `minAppVersion` 把插件挡下并说明要哪个版本,不会装上去静默不工作。宿主发版时若不是 2.11.2,改这一行并重打 release。
+`minAppVersion` is pinned to **2.11.2**: the plugin needs `ctx.desk` (the Agent Desk companion seam), `ctx.tangu.startChat` and `ctx.app.writeBytes`, and per-agent binding additionally needs `ctx.tangu.agents` and the session's agent on the status seam — none of which shipped before host 2.11.2. Older hosts block the plugin and name the version they need instead of installing something that silently does nothing.

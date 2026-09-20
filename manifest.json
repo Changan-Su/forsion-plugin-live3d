@@ -4,7 +4,7 @@
   "nameEn": "Live3D",
   "version": "0.1.0",
   "apiVersion": 1,
-  "minAppVersion": "2.12.0",
+  "minAppVersion": "2.11.2",
   "description": "在 Tangu 聊天右侧的 Agent Desk 里放一个 3D 形象(VRM 0.x / 1.0、GLB、glTF、FBX、OBJ),跟着 Agent 的状态做反应:思考时抬眼琢磨,说话时口型随输出一张一合,调工具时低头干活,等你回应时蹦一下,出错时垂头,完成时庆祝。两种显示模式:空闲显示(Desk 上没有文件时出现)与总是显示(完全替换 Desk 的文件展示)。常见格式直接导入,插件自动分析并生成配置;PMX、压缩包、压缩过的模型交给随包的 Live3D Importer Agent 协助转换。没导入模型时显示一个会做表情的小球。全部离线渲染。暂不支持 Live2D(授权原因)。",
   "descriptionEn": "Puts a 3D avatar (VRM 0.x / 1.0, GLB, glTF, FBX, OBJ) on the Agent Desk to the right of the Tangu chat and makes it react to the agent: it looks up while thinking, its mouth follows the answer as it streams, it looks down at work while a tool runs, hops when it needs you, droops on errors and celebrates when a run finishes. Two display modes: when idle (appears while the Desk has no files) and always (completely replaces the Desk's file presentation). Common formats import directly and get an automatic profile; PMX, archives and compressed models go to the bundled Live3D Importer agent for conversion. Until you import a model, a friendly orb reacts instead. Renders fully offline. Live2D is not supported yet (licence).",
   "main": "main.js",

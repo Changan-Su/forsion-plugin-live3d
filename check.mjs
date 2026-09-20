@@ -81,7 +81,7 @@ await t('manifest 基本面:id / 名称 / apiVersion / main;minAppVersion 钉住
   A.equal(manifest.apiVersion, 1)
   A.equal(manifest.main, 'main.js')
   // 不钉 = 旧宿主上装得进去、Desk 里却什么都不出现(静默空操作);钉住则由宿主挡下并说明要哪个版本
-  A.equal(manifest.minAppVersion, '2.12.0', 'minAppVersion 要钉到第一个带 ctx.desk / ctx.tangu.agents 的宿主版本')
+  A.equal(manifest.minAppVersion, '2.11.2', 'minAppVersion 要钉到第一个带 ctx.desk / ctx.tangu.agents 的宿主版本')
   A.match(changelog, /minAppVersion` 钉在/, 'CHANGELOG 要写明 minAppVersion 钉在哪个宿主版本')
   A.ok(manifest.description && manifest.descriptionEn, '缺 description / descriptionEn')
 })

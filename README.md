@@ -62,7 +62,7 @@ Live3D/
 
 ## 宿主要求与已知限制
 
-- **需要 Forsion 2.12.0 及以上的桌面 Tangu**(`manifest.minAppVersion`):伴随面要 `ctx.desk`,导入二进制文件要 `ctx.app.writeBytes`,开协助导入的对话要 `ctx.tangu.startChat`,按 Agent 绑定还要 `ctx.tangu.agents` 与状态接缝里的会话归属 —— 截至 2.11.1 这批接缝都还没发版。更早的宿主会按 `minAppVersion` 直接挡下整个插件并说明要哪个版本,不会装上去静默不工作。
+- **需要 Forsion 2.11.2 及以上的桌面 Tangu**(`manifest.minAppVersion`):伴随面要 `ctx.desk`,导入二进制文件要 `ctx.app.writeBytes`,开协助导入的对话要 `ctx.tangu.startChat`,按 Agent 绑定还要 `ctx.tangu.agents` 与状态接缝里的会话归属 —— 这批接缝随 2.11.2 一起发,2.11.1 及更早都还没有。更早的宿主会按 `minAppVersion` 直接挡下整个插件并说明要哪个版本,不会装上去静默不工作。
 - 形象存放在笔记库里:没打开过笔记库时(宿主的库是惰性恢复的)Desk 先显示小球,打开库后自动换上。
 - Mixamo 动作不能套到 VRM 上(不做骨骼重定向);VRM 请用 .vrma 动作。
 - 只在桌面端运行(web / 移动端的 CSP 不允许 `new Function` 与 WebGL 资源协议)。
@@ -104,4 +104,4 @@ sh install.sh        # 装到 ~/.forsion-dev(prod:sh install.sh prod)
 
 **Idle pose.** When a model brings no animation clips (MMD, most VRoid exports), the plugin poses the arms and torso itself. Four sliders in the library (arms out / arms forward / elbow bend / liveliness) save as you release them, or just tell an agent "its hands are stuck in the skirt". Where a clip drives a bone, the clip wins and `pose` does nothing.
 
-**Requirements and limits.** Needs desktop Forsion 2.12.0 or newer (`manifest.minAppVersion`): the companion needs `ctx.desk`, binary import needs `ctx.app.writeBytes`, the assisted-import chat needs `ctx.tangu.startChat`, and per-agent binding also needs `ctx.tangu.agents` plus the session's agent on the status seam — none of that had shipped as of host 2.11.1. Older hosts block the whole plugin and name the version they need, rather than installing something that silently does nothing. Models live in the vault, so until the vault has been opened this session the Desk shows the orb. Mixamo motions cannot be retargeted onto VRM avatars (use .vrma). Desktop only.
+**Requirements and limits.** Needs desktop Forsion 2.11.2 or newer (`manifest.minAppVersion`): the companion needs `ctx.desk`, binary import needs `ctx.app.writeBytes`, the assisted-import chat needs `ctx.tangu.startChat`, and per-agent binding also needs `ctx.tangu.agents` plus the session's agent on the status seam — none of that shipped before host 2.11.2. Older hosts block the whole plugin and name the version they need, rather than installing something that silently does nothing. Models live in the vault, so until the vault has been opened this session the Desk shows the orb. Mixamo motions cannot be retargeted onto VRM avatars (use .vrma). Desktop only.
