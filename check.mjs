@@ -242,7 +242,7 @@ for (const [guard, member] of [['.desk?.', 'registerCompanion'], ['.tangu?.', 's
 }
 
 // ── 4. 全量 ctx ──────────────────────────────────────────────────────────────
-await t('新宿主:注册伴随面(id avatar,缺省 idle)、模型库视图、设置面、5 条 live3d- 命令且没有热键', async () => {
+await t('新宿主:注册伴随面(id avatar,缺省 idle)、模型库 / 3D 小屋两个视图、设置面、7 条 live3d- 命令且没有热键', async () => {
   installDom()
   const { ctx, log } = fullCtx()
   const d = load(main, ctx)
@@ -251,10 +251,10 @@ await t('新宿主:注册伴随面(id avatar,缺省 idle)、模型库视图、�
   A.equal(log.companions[0].id, 'avatar')
   A.equal(log.companions[0].mode, 'idle')
   A.equal(typeof log.companions[0].mount, 'function')
-  A.deepEqual(log.views.map((v) => v.id), ['studio'])
+  A.deepEqual(log.views.map((v) => v.id), ['studio', 'room'])
   A.equal(log.settings.length, 1)
   const ids = log.commands.map((c) => c.id).sort()
-  A.deepEqual(ids, ['live3d-agent-import', 'live3d-import', 'live3d-open-studio', 'live3d-refresh', 'live3d-toggle-mode'])
+  A.deepEqual(ids, ['live3d-agent-import', 'live3d-import', 'live3d-open-room', 'live3d-open-studio', 'live3d-refresh', 'live3d-screensaver', 'live3d-toggle-mode'])
   for (const c of log.commands) {
     A.ok(!('hotkey' in c), `${c.id} 带了 hotkey`)
     A.ok(c.title && typeof c.run === 'function')
@@ -359,6 +359,162 @@ await t('dispose 收干净:没有残留的 window/document 监听、定时器、
   await flush()
   A.deepEqual(leftovers(), { win: 0, doc: 0, timeouts: 0, intervals: 0, styles: 0, bodyKids: 0 })
   A.equal(log.handleDisposed, 1)
+})
+
+// ── 4b. 3D 小屋 / 屏保 / Space ──────────────────────────────────────────────
+/** 宿主 userSpaces.tsx 的图标白名单(手抄;不在表里的名字静默回落方块图标)。 */
+const SPACE_ICONS = ['bot', 'inbox', 'mail', 'notebook-text', 'book-open', 'briefcase', 'calendar-days', 'message-circle', 'folder', 'folder-open',
+  'file-text', 'star', 'heart', 'home', 'target', 'zap', 'globe', 'music', 'image', 'video', 'code', 'terminal', 'layout-grid', 'sparkles', 'boxes',
+  'list-tree', 'server', 'server-cog']
+await t('Space 配方:spaces/live3d/space.json 合法、双语名、白名单图标,只引用本插件注册了的视图(且都写进 requires)', async () => {
+  const dirs = readdirSync(join(ROOT, 'spaces')).filter((d) => !d.startsWith('.'))
+  A.deepEqual(dirs, ['live3d'])
+  const sp = JSON.parse(rd('spaces/live3d/space.json'))
+  A.match(sp.id, /^[a-z0-9][a-z0-9-]{0,63}$/)
+  A.ok(!['tangu', 'inbox', 'amadeus', 'calendar', 'muse'].includes(sp.id), '占了宿主保留的 Space id')
+  A.ok(sp.name.zh && sp.name.en && !HAN.test(sp.name.en))
+  A.ok(SPACE_ICONS.includes(sp.icon), `图标 ${sp.icon} 不在宿主白名单`)
+  A.ok(sp.version, '发布必填 version(市场「可更新」检查读它)')
+  A.ok(sp.layout.main.length >= 1)
+  installDom()
+  const { ctx, log } = fullCtx()
+  const d = load(main, ctx)
+  const mine = new Set(log.views.map((v) => `plugin:live3d:${v.id}`))
+  const used = [...sp.layout.main, ...sp.layout.left, ...sp.layout.right].map((x) => x.type)
+  for (const ty of used.filter((x) => x.startsWith('plugin:'))) {
+    A.ok(mine.has(ty), `配方引用了没注册的视图 ${ty}(宿主会整包拒载这个 Space)`)
+    A.ok(sp.requires.views.includes(ty), `${ty} 没写进 requires.views`)
+  }
+  d()
+})
+await t('3D 小屋视图:节点里没有 WebGL → 挂上不抛、说明原因;场景库列出好的、坏的进问题清单;卸下收干净', async () => {
+  installDom()
+  const { ctx, log, vault } = fullCtx()
+  vault.set('Live3D/scenes/good/scene.json', JSON.stringify({ live3d: 1, name: { zh: '好房间', en: 'Good room' }, props: [{ type: 'bed', id: 'bed', at: [-1, -1] }] }))
+  vault.set('Live3D/scenes/bad/scene.json', '{ "live3d": 1, "props": [ { "type": "bed" } ] }')
+  const d = load(main, ctx)
+  await flush()
+  const room = log.views.find((v) => v.id === 'room')
+  const el = mkEl()
+  const off = room.mount(el)
+  await flush(80)
+  const tools = el.querySelector('[data-part="tools"]').innerHTML
+  A.match(tools, /好房间/, '场景下拉里没有好的那份')
+  const notes = el.querySelector('[data-part="notes"]').innerHTML
+  A.match(notes, /bad/, '坏场景没进问题清单')
+  A.match(notes, /\[x, z\]/, '问题原因没照原样给出')
+  A.ok(consoleNoise.some((x) => /WebGL/i.test(x)), '没有 WebGL 时该出声')
+  off()
+  d()
+  await flush()
+  A.deepEqual(leftovers(), { win: 0, doc: 0, timeouts: 0, intervals: 0, styles: 0, bodyKids: 0 })
+})
+await t('屏保:命令手动启动 → 盖一层 .l3-saver;任意键退出且键被吃掉;缺省不因空闲自启;开了 + 窗口在前台 + 空闲够久才自启;不在前台不启', async () => {
+  installDom()
+  const { ctx, log } = fullCtx()
+  const d = load(main, ctx)
+  await flush()
+  const saverCmd = log.commands.find((c) => c.id === 'live3d-screensaver')
+  saverCmd.run()
+  const overlay = body.children.find((c) => c.className === 'l3-saver')
+  A.ok(overlay, '没盖上屏保层')
+  const keys = [...live.win.values()].filter((v) => v.type === 'keydown')
+  let prevented = 0
+  let stopped = 0
+  for (const k of keys) k.fn({ type: 'keydown', key: 'a', preventDefault() { prevented++ }, stopPropagation() {}, stopImmediatePropagation() { stopped++ } })
+  A.ok(prevented >= 1, '叫醒屏保的那个键没被吃掉(会打进聊天框)')
+  A.ok(stopped >= 1, '叫醒屏保的那个键没拦住同层的其它监听(宿主热键会收到)')
+  await fireTimeouts()
+  A.ok(!body.children.some((c) => c.className === 'l3-saver'), '按键后屏保层没撤')
+  // 空闲自启:缺省关
+  const realNow = Date.now
+  let now = realNow()
+  Date.now = () => now
+  try {
+    document.hasFocus = () => true
+    now += 3600_000
+    await fireIntervals()
+    A.ok(!body.children.some((c) => c.className === 'l3-saver'), '缺省(关)也自启了')
+    // 打开:设置面勾上
+    const sv = log.settings[0]
+    const sel = mkEl()
+    const offS = sv.mount(sel)
+    sel.fire('change', { target: { dataset: { act: 'saver-on' }, checked: true, value: 'on' } })
+    await flush()
+    A.equal(log.saved.at(-1).saver.enabled, true, '勾选没落盘')
+    // 窗口不在前台:不启
+    document.hasFocus = () => false
+    now += 3600_000
+    await fireIntervals()
+    A.ok(!body.children.some((c) => c.className === 'l3-saver'), '窗口不在前台也自启了')
+    document.hasFocus = () => true
+    now += 3600_000
+    await fireIntervals()
+    A.ok(body.children.some((c) => c.className === 'l3-saver'), '开了、在前台、空闲一小时,没自启')
+    offS()
+  } finally {
+    Date.now = realNow
+  }
+  d()
+  await flush()
+  await fireTimeouts()
+  A.deepEqual(leftovers(), { win: 0, doc: 0, timeouts: 0, intervals: 0, styles: 0, bodyKids: 0 })
+})
+await t('3D 小屋:新建场景绝不覆盖已存在的文件夹(哪怕里面的 scene.json 是坏的)', async () => {
+  installDom()
+  const { ctx, log, vault } = fullCtx()
+  vault.set('Live3D/scenes/my-room/scene.json', '{ 写坏了的 json')
+  const d = load(main, ctx)
+  await flush()
+  const el = mkEl()
+  const off = log.views.find((v) => v.id === 'room').mount(el)
+  await flush(80)
+  const root = el.querySelector('.l3-room')
+  root.fire('click', { target: { closest: () => ({ dataset: { act: 'new-scene' } }) } })
+  await flush(80)
+  A.equal(vault.get('Live3D/scenes/my-room/scene.json'), '{ 写坏了的 json', '坏文件被模板覆盖了(用户的内容丢了)')
+  A.ok(vault.has('Live3D/scenes/my-room-2/scene.json'), '没换个名字新建')
+  off()
+  d()
+  await flush()
+})
+await t('屏保:全屏请求迟到(屏保已经退了才回来)→ 立刻退出全屏;退出后焦点还给原来的输入框', async () => {
+  installDom()
+  let resolveFs = null
+  let exited = 0
+  let focused = 0
+  const realCreate = document.createElement
+  document.createElement = (tag) => {
+    const e = realCreate(tag)
+    e.requestFullscreen = () => new Promise((res) => { resolveFs = () => { document.fullscreenElement = e; res() } })
+    return e
+  }
+  document.exitFullscreen = async () => { exited++; document.fullscreenElement = null }
+  document.activeElement = { isConnected: true, focus() { focused++ } }
+  const { ctx, log } = fullCtx()
+  const d = load(main, ctx)
+  await flush()
+  log.commands.find((c) => c.id === 'live3d-screensaver').run()
+  A.ok(resolveFs, '没请求全屏')
+  for (const k of [...live.win.values()].filter((v) => v.type === 'keydown')) k.fn({ type: 'keydown', code: 'KeyA', preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {} })
+  // 按住不放:自动重复的 keydown 不许漏到(已经拿回焦点的)输入框,松开那一下也吞掉
+  let leaked = 0
+  const ev = (type, code) => ({ type, code, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {}, _swallowed: false })
+  for (const type of ['keydown', 'keydown', 'keyup']) {
+    const e = ev(type, 'KeyA')
+    let blocked = false
+    e.preventDefault = () => { blocked = true }
+    for (const k of [...live.win.values()].filter((v) => v.type === type)) k.fn(e)
+    if (!blocked) leaked++
+  }
+  A.equal(leaked, 0, '按住叫醒键时的重复 / 松开漏到了页面上')
+  resolveFs()
+  await flush()
+  A.equal(exited, 1, '屏保退了之后才回来的全屏请求没被退掉(窗口会卡在系统全屏)')
+  A.equal(focused, 1, '焦点没还给启动前的输入框')
+  d()
+  await flush()
+  await fireTimeouts()
 })
 
 // ── 5. 导入流程 ──────────────────────────────────────────────────────────────
@@ -847,7 +1003,7 @@ await t('SKILL.md 格式配方:命令里的文件路径都按工作文件夹写(
 })
 
 // ── 8. 打包 ──────────────────────────────────────────────────────────────────
-await t('install.sh:缺省 dev、prod 须显式;拒绝从已安装目录运行;先跑 check;cp 不 ln;拷 skills/ 与 agents/', () => {
+await t('install.sh:缺省 dev、prod 须显式;拒绝从已安装目录运行;先跑 check;cp 不 ln;拷 skills/、agents/ 与 spaces/', () => {
   const sh = rd('install.sh')
   A.match(sh, /MODE="\$\{1:-dev\}"/)
   A.match(sh, /prod\)\s+HOME_DIR="\$HOME\/\.forsion"/)
@@ -857,6 +1013,8 @@ await t('install.sh:缺省 dev、prod 须显式;拒绝从已安装目录运行;�
   // 按去掉注释的正文、锚定目标 $DEST/ 断言(注释掉的 cp、拷进 agents/<slug>/ 造出遮蔽副本都得红)
   A.match(code, /^cp -R "\$HERE\/agents" "\$DEST\/" \|\| exit 1$/m)
   A.match(code, /^cp -R "\$HERE\/skills" "\$DEST\/" \|\| exit 1$/m)
+  // 捆绑包内嵌的 Space(宿主扫 plugins/<id>/spaces/<slug>/space.json):漏拷 = Space 永远不出现、零告警
+  A.match(code, /^cp -R "\$HERE\/spaces" "\$DEST\/" \|\| exit 1$/m)
   // 迁移:原样的旧 agent 级副本要删(指纹核对),改过的只警告
   A.match(code, /OLD="\$HOME_DIR\/tangu\/agents\/live3d-importer\/skills\/live3d-import"/)
   A.match(code, /\.seed-stamp/)

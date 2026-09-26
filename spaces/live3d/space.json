@@ -1,0 +1,12 @@
+{
+  "id": "live3d",
+  "name": { "zh": "3D 小屋", "en": "3D room" },
+  "icon": "sparkles",
+  "version": "1",
+  "layout": {
+    "main": [{ "type": "plugin:live3d:room" }],
+    "left": [],
+    "right": [{ "type": "chat", "params": { "followActive": true, "reuseKey": "primary" } }]
+  },
+  "requires": { "views": ["plugin:live3d:room", "chat"] }
+}

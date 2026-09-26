@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 — 2026-09-26
+
+- **3D 小屋(独立 Space)**:左侧功能条新增「3D 小屋」,主区是一间三面剖开的等距小房间,右侧是聊天。形象住在房间里自己过日子(走动、坐下看书、躺上床睡觉、弹琴、看星星……),Agent 干活时起身去书桌:思考托腮、调工具埋头干活、说话时转过来对着你、等你回应时走到跟前招手、完成欢呼、出错叹气。
+  **3D room (its own Space)**: a cut-away isometric room where the avatar goes about its day and heads to the desk when the agent works — thinking, busy with a tool, turning round to talk to you, walking up to wave when it needs you, cheering or sighing.
+- **场景是数据**:`scenes/<名字>/scene.json` 描述房间、24 种程序化道具、日常活动(地点 / 姿势 / 时长 / 权重 / 昼夜 / 头顶符号 / 接续)与 Agent 各阶段的活动;保存即生效,坏文件原样列出原因。25 个全身姿势(坐、躺、趴桌、弹琴、望远镜、伸懒腰、打哈欠、站着打瞌睡……),网格寻路绕开家具,昼夜光照(窗洞斜光、夜里台灯)。
+  **Scenes are data**: `scenes/<name>/scene.json` describes the room, 24 procedural prop types, daily activities and what each agent phase triggers; saving reloads it and broken files are listed with the reason. 25 full-body poses, grid path-finding around furniture, day and night lighting.
+- **全屏屏保**:设置里打开「空闲时显示屏保」(缺省关):窗口在前台且一段时间没有操作 → 铺满窗口显示小屋 + 时钟,任意键 / 点击 / 移动鼠标返回;手动启动进入系统全屏。与小屋共用一块画布。
+  **Full-screen screensaver** (off by default): after a few idle minutes while Forsion is in front, the room fills the window with a clock; any input brings you back. Starting it by hand goes full screen. It shares one canvas with the room view.
+- MMD 模型的付与(append)骨骼现在会解算:腿、捩り骨的网格挂在付与骨上,不解算就转不动。
+  MMD append (grant) bones are now solved, so legs and twist bones move with the pose.
+- 点一下房间里的角色:醒着打招呼,睡着的会被吵醒(皱眉、打哈欠)。
+  Click the character in the room: awake it waves, asleep it wakes up grumpy.
+
 ## 0.1.0 — 2026-09-20
 
 首个版本 / First release.

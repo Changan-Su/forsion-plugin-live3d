@@ -35,6 +35,8 @@ for f in main.js manifest.json README.md CHANGELOG.md LICENSE icon.png; do
 done
 cp -R "$HERE/skills" "$DEST/" || exit 1
 cp -R "$HERE/agents" "$DEST/" || exit 1
+# 捆绑包内嵌的 Space(「3D 小屋」):宿主扫 plugins/<id>/spaces/<slug>/space.json;漏拷 = Space 永远不出现、零告警
+cp -R "$HERE/spaces" "$DEST/" || exit 1
 
 # 迁移:早期版本把技能放在 agents/live3d-importer/skills/,引擎播种进了 tangu/agents/live3d-importer/skills/。
 # 那份 agent 级副本同 id 优先于包根的全局技能,而包里不再有它的来源 → 引擎既不更新也不删,导入 Agent 永远用旧版。
@@ -65,4 +67,5 @@ fi
 echo "✅ 已安装 → $DEST"
 echo "   全局技能:$(ls "$DEST/skills" 2>/dev/null | tr '\n' ' ')(所有 Agent 可用)"
 echo "   随包 Agent:$(ls "$DEST/agents" 2>/dev/null | tr '\n' ' ')(引擎启动时播种到 $HOME_DIR/tangu/agents/,已存在则保留)"
+echo "   Space:$(ls "$DEST/spaces" 2>/dev/null | tr '\n' ' ')(左侧功能条「3D 小屋」)"
 echo "重开 Forsion(dev:重启 desktop)后:设置 → 插件 → Live3D,或命令面板「Live3D:打开模型库」。"

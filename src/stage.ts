@@ -77,6 +77,8 @@ export interface Stage {
 export interface Anchors {
   box: THREE.Box3
   head?: THREE.Vector3
+  /** 两侧髋关节的中点(有腿骨时);场景里坐下要让它落在座面上。 */
+  hip?: THREE.Vector3
   /** 像人(有头骨 / 瘦高):bust / face 构图才有意义。 */
   humanoid: boolean
 }
@@ -93,6 +95,44 @@ export interface FrameInput {
   proc: ProcPlan
   /** prefers-reduced-motion。 */
   reduced: boolean
+  /** 全身姿势层(场景里走 / 坐 / 躺 / 干活)。省略 = Desk 那套待机(手臂放松、躯干呼吸)。 */
+  body?: BodyFrame
+}
+
+/** 一条手臂 / 腿的方向目标:上段(上臂)与下段(前臂)各指向哪,**朝向系**里的单位向量(+Z 朝前、+X 是角色左手边、
+ *  +Y 朝上)。用方向而不是角度:T-pose / A-pose / MMD 的斜垂臂量出来的「现在指向哪」各不相同,瞄同一个方向结果一致。 */
+export interface LimbAim {
+  upper: readonly [number, number, number]
+  lower: readonly [number, number, number]
+  /** 0..1:这一层接管多少(0 = 退回 Desk 待机的放松手臂)。 */
+  w: number
+}
+
+/** 一条腿:大腿在朝向系里的欧拉角(x 负 = 往前抬,z 正 = 往外撇;弧度)+ 膝盖弯(正 = 小腿往后收)+ 脚踝。
+ *  腿的静止姿势各家都是「竖直向下」,所以腿用角度就够(手臂才需要方向瞄准)。 */
+export interface LegPose {
+  thigh: readonly [number, number, number]
+  knee: number
+  foot: number
+  w: number
+}
+
+/** 场景每帧喂给形象的全身姿势。角度一律弧度、朝向系。 */
+export interface BodyFrame {
+  armL?: LimbAim
+  armR?: LimbAim
+  legL?: LegPose
+  legR?: LegPose
+  spine?: readonly [number, number, number]
+  chest?: readonly [number, number, number]
+  neck?: readonly [number, number, number]
+  head?: readonly [number, number, number]
+  /** 闭眼程度 0..1(睡觉 / 打哈欠)—— 压过眨眼。 */
+  eyes?: number
+  /** 额外的表情 / morph 权重(已解析成模型里的真名);同名时压过阶段表情。 */
+  expr?: Readonly<Record<string, number>>
+  /** 待机呼吸 / 轻晃的倍率(睡着时呼吸更深更慢由场景自己做;这里 0 = 关掉 Desk 那层)。缺省 1。 */
+  idle?: number
 }
 
 export interface Avatar {
@@ -132,6 +172,8 @@ const damp = (cur: number, target: number, rate: number, dt: number): number => 
 const _q = new THREE.Quaternion()
 const _q2 = new THREE.Quaternion()
 const _qp = new THREE.Quaternion()
+const _qh = new THREE.Quaternion()
+const _aim = new THREE.Vector3()
 const _e = new THREE.Euler()
 const _v = new THREE.Vector3()
 const _v2 = new THREE.Vector3()
@@ -150,7 +192,7 @@ function rotateInFacing(bone: THREE.Object3D, facing: THREE.Quaternion, dLocal: 
 const eulerQ = (x: number, y: number, z: number): THREE.Quaternion => new THREE.Quaternion().setFromEuler(_e.set(x, y, z, 'YXZ'))
 
 // ── 模型形象 ──────────────────────────────────────────────────────────────────
-interface ModelAvatarOptions {
+export interface ModelAvatarOptions {
   loaded: LoadedModel
   profile: ResolvedProfile
 }
@@ -162,9 +204,11 @@ const VRM_ROLE: Record<RigRole, VRMHumanBoneName> = {
   hips: 'hips', spine: 'spine', chest: 'chest', neck: 'neck', head: 'head',
   leftUpperArm: 'leftUpperArm', rightUpperArm: 'rightUpperArm', leftLowerArm: 'leftLowerArm', rightLowerArm: 'rightLowerArm',
   leftHand: 'leftHand', rightHand: 'rightHand',
+  leftUpperLeg: 'leftUpperLeg', rightUpperLeg: 'rightUpperLeg', leftLowerLeg: 'leftLowerLeg', rightLowerLeg: 'rightLowerLeg',
+  leftFoot: 'leftFoot', rightFoot: 'rightFoot',
 }
 
-function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
+export function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
   const vrm: VRM | undefined = loaded.vrm
   const model = loaded.root
 
@@ -277,6 +321,11 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
 
   const nbox = box.clone().applyMatrix4(norm.matrix).applyMatrix4(xf.matrix)
   let head: THREE.Vector3 | undefined
+  let hip: THREE.Vector3 | undefined
+  if (bones.leftUpperLeg && bones.rightUpperLeg) {
+    pivot.updateMatrixWorld(true)
+    hip = bones.leftUpperLeg.getWorldPosition(new THREE.Vector3()).add(bones.rightUpperLeg.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5)
+  }
   if (bones.head) {
     if (idleClip) {
       mixer.clipAction(idleClip).play()
@@ -289,7 +338,7 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
     for (const [b, q] of rest) b.quaternion.copy(q)
   }
   const nsize = nbox.getSize(new THREE.Vector3())
-  const anchors: Anchors = { box: nbox, head, humanoid: hasHead || nsize.y > 1.2 * Math.max(nsize.x, nsize.z) }
+  const anchors: Anchors = { box: nbox, head, hip, humanoid: hasHead || nsize.y > 1.2 * Math.max(nsize.x, nsize.z) }
   // 每帧的「基准姿势」:起初 = 静止姿势,之后 = 上一帧 mixer 的输出(见顶注:mixer 只在值变了才写骨骼)。
   const base = new Map([...rest].map(([b, q]) => [b, q.clone()] as const))
 
@@ -412,6 +461,41 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
     }
   }
 
+  /** 手臂瞄准(场景姿势层):上臂指向 upper、前臂指向 lower(朝向系单位向量),按 w 混。前臂的目标按**上臂转完之后**
+   *  的位置量,所以两段互不牵扯。与 relaxArm 同一套「量现在指向 → setFromUnitVectors」的做法,只是目标由场景给。 */
+  const aimLimb = (
+    upper: THREE.Object3D | undefined, lower: THREE.Object3D | undefined, end: THREE.Object3D | undefined, aim: LimbAim,
+  ): void => {
+    if (!upper || !lower || aim.w <= 0.001) return
+    const seg = (a: THREE.Object3D, b: THREE.Object3D, dir: readonly [number, number, number], w: number, who: THREE.Object3D): void => {
+      a.getWorldPosition(_v)
+      b.getWorldPosition(_v2)
+      armDir.subVectors(_v2, _v)
+      if (armDir.lengthSq() < 1e-10) return
+      armDir.normalize()
+      const target = _aim.set(dir[0], dir[1], dir[2])
+      if (target.lengthSq() < 1e-10) return
+      target.normalize().applyQuaternion(facing)
+      const d = new THREE.Quaternion().setFromUnitVectors(armDir, target)
+      const dLocal = facing.clone().invert().multiply(d).multiply(facing)
+      rotateInFacing(who, facing, new THREE.Quaternion().slerp(dLocal, w))
+    }
+    seg(upper, lower, aim.upper, aim.w, upper)
+    if (end) seg(lower, end, aim.lower, aim.w, lower)
+  }
+
+  /** 腿(场景姿势层):大腿按欧拉角转;膝盖绕**大腿自己的左右轴**弯(大腿往外撇时小腿仍在大腿平面里折);脚踝同理。 */
+  const applyLeg = (thigh: THREE.Object3D | undefined, knee: THREE.Object3D | undefined, foot: THREE.Object3D | undefined, p: LegPose): void => {
+    if (!thigh || p.w <= 0.001) return
+    const qT = eulerQ(p.thigh[0] * p.w, p.thigh[1] * p.w, p.thigh[2] * p.w)
+    rotateInFacing(thigh, facing, qT)
+    const hinge = (angle: number): THREE.Quaternion =>
+      qT.clone().multiply(_qh.setFromAxisAngle(_side, angle * p.w)).multiply(qT.clone().invert())
+    if (knee && Math.abs(p.knee) > 1e-4) rotateInFacing(knee, facing, hinge(p.knee))
+    // 绕同一根铰链轴转不改变轴本身:脚踝的左右轴仍是 qT·X
+    if (foot && Math.abs(p.foot) > 1e-4) rotateInFacing(foot, facing, hinge(p.foot))
+  }
+
   return {
     root: pivot,
     anchors,
@@ -433,7 +517,8 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
     },
     update(f: FrameInput) {
       const { t, dt, proc } = f
-      const k = (f.reduced ? 0.35 : 1) * pose.liveliness
+      const body = f.body
+      const k = (f.reduced ? 0.35 : 1) * pose.liveliness * (body?.idle ?? 1)
 
       // ① 还原基准姿势(撤掉上一帧叠的程序化旋转)→ 片段切换 → mixer → 记下 mixer 的输出当新基准。
       //    mixer 这一帧没写的骨骼(值没变)保持上一帧的片段姿势;没有片段绑定的骨骼基准一直是静止姿势;
@@ -448,20 +533,30 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
       pivot.updateMatrixWorld(true)
       xf.getWorldQuaternion(facing)
 
-      // ② 程序化:手臂 → 躯干 → 头
-      relaxArm(bones.leftUpperArm, bones.leftLowerArm, bones.leftHand, 1, 1 - clipWeightOn(bones.leftUpperArm), armDrift(t, 1, k))
-      relaxArm(bones.rightUpperArm, bones.rightLowerArm, bones.rightHand, -1, 1 - clipWeightOn(bones.rightUpperArm), armDrift(t, -1, k))
+      // ② 程序化:手臂 → 腿 → 躯干 → 头。场景姿势层接管的手臂按 1-w 留给放松姿势(两层之间平滑过渡)。
+      const wl = 1 - clipWeightOn(bones.leftUpperArm)
+      const wr = 1 - clipWeightOn(bones.rightUpperArm)
+      relaxArm(bones.leftUpperArm, bones.leftLowerArm, bones.leftHand, 1, wl * (1 - (body?.armL?.w ?? 0)), armDrift(t, 1, k))
+      relaxArm(bones.rightUpperArm, bones.rightLowerArm, bones.rightHand, -1, wr * (1 - (body?.armR?.w ?? 0)), armDrift(t, -1, k))
+      if (body?.armL) aimLimb(bones.leftUpperArm, bones.leftLowerArm, bones.leftHand, { ...body.armL, w: body.armL.w * wl })
+      if (body?.armR) aimLimb(bones.rightUpperArm, bones.rightLowerArm, bones.rightHand, { ...body.armR, w: body.armR.w * wr })
+      if (body?.legL) applyLeg(bones.leftUpperLeg, bones.leftLowerLeg, bones.leftFoot, body.legL)
+      if (body?.legR) applyLeg(bones.rightUpperLeg, bones.rightLowerLeg, bones.rightFoot, body.legR)
       const breath = Math.sin(t * Math.PI * 2 / 4.2)
       const sway = Math.sin(t * Math.PI * 2 / 6.3) * 0.02 * proc.sway * k
       const lean = 0.12 * proc.droop
-      if (bones.spine) rotateInFacing(bones.spine, facing, eulerQ(lean * 0.5 + breath * 0.012 * k, 0, sway))
-      if (bones.chest) rotateInFacing(bones.chest, facing, eulerQ(lean * 0.5 + breath * 0.018 * k, f.look.yaw * 0.08, sway * 0.5))
+      const bs = body?.spine
+      const bc = body?.chest
+      if (bones.spine) rotateInFacing(bones.spine, facing, eulerQ(lean * 0.5 + breath * 0.012 * k + (bs?.[0] ?? 0), bs?.[1] ?? 0, sway + (bs?.[2] ?? 0)))
+      if (bones.chest) rotateInFacing(bones.chest, facing, eulerQ(lean * 0.5 + breath * 0.018 * k + (bc?.[0] ?? 0), f.look.yaw * 0.08 + (bc?.[1] ?? 0), sway * 0.5 + (bc?.[2] ?? 0)))
       const nod = Math.sin(t * Math.PI * 2 * 1.7) * 0.07 * proc.nod * k
       const droopPitch = 0.3 * proc.droop
       const yaw = f.look.yaw
       const pitch = f.look.pitch
-      if (bones.neck) rotateInFacing(bones.neck, facing, eulerQ(-pitch * 0.35 + droopPitch * 0.4 + nod * 0.4, yaw * 0.35, proc.headTilt * 0.3))
-      if (bones.head) rotateInFacing(bones.head, facing, eulerQ(-pitch * 0.5 + droopPitch * 0.6 + nod * 0.6, yaw * 0.55, proc.headTilt * 0.7))
+      const bn = body?.neck
+      const bh = body?.head
+      if (bones.neck) rotateInFacing(bones.neck, facing, eulerQ(-pitch * 0.35 + droopPitch * 0.4 + nod * 0.4 + (bn?.[0] ?? 0), yaw * 0.35 + (bn?.[1] ?? 0), proc.headTilt * 0.3 + (bn?.[2] ?? 0)))
+      if (bones.head) rotateInFacing(bones.head, facing, eulerQ(-pitch * 0.5 + droopPitch * 0.6 + nod * 0.6 + (bh?.[0] ?? 0), yaw * 0.55 + (bh?.[1] ?? 0), proc.headTilt * 0.7 + (bh?.[2] ?? 0)))
 
       // 没有头骨的模型:整个转向指针 + 呼吸缩放 + 轻晃
       const hop = Math.abs(Math.sin(t * Math.PI * 2.2)) * 0.06 * proc.bounce * k
@@ -486,7 +581,7 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
       }
 
       // ④ 表情:目标权重平滑;眨眼;口型
-      const targets = plan.expressions
+      const targets = body?.expr ? { ...plan.expressions, ...body.expr } : plan.expressions
       for (const name of new Set([...exprCur.keys(), ...Object.keys(targets)])) {
         const v = damp(exprCur.get(name) ?? 0, targets[name] ?? 0, 6, dt)
         exprCur.set(name, v)
@@ -502,7 +597,8 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
           nextBlink = t + 2 + Math.random() * 4
         } else blink = Math.sin(bt * Math.PI)
       }
-      for (const b of blinkNames) if (!(b in targets)) setWeight(b, blink)
+      const eyes = body?.eyes ?? 0
+      for (const b of blinkNames) if (!(b in targets)) setWeight(b, Math.max(blink, eyes))
       // 口型:不说话了 / 换了通道 → 上一次驱动的通道平滑收回 0(它若同时是表情目标,交给上面的表情循环)
       if (lastMouth && lastMouth !== plan.mouth) {
         if (!(lastMouth in targets)) {
@@ -525,6 +621,8 @@ function createModelAvatar({ loaded, profile }: ModelAvatarOptions): Avatar {
         const n = Math.max(1, Math.ceil(dt / SPRING_STEP - 1e-6))
         for (let i = 0; i < n; i++) vrm.update(dt / n)
       }
+      // ⑥ 骨架自带的约束(MMD 付与):腿 / 捩り骨的网格挂在付与骨上,不跟就转不动
+      loaded.afterPose?.()
       loaded.tick?.(dt)
     },
     dispose() {
