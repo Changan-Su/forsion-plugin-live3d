@@ -374,6 +374,10 @@ await t('Space 配方:spaces/live3d/space.json 合法、双语名、白名单图
   A.ok(!['tangu', 'inbox', 'amadeus', 'calendar', 'muse'].includes(sp.id), '占了宿主保留的 Space id')
   A.ok(sp.name.zh && sp.name.en && !HAN.test(sp.name.en))
   A.ok(SPACE_ICONS.includes(sp.icon), `图标 ${sp.icon} 不在宿主白名单`)
+  // 自绘图标(宿主 spaceIcon.ts):裸文件名,先找 Space 目录、再找包根 → "icon.png" = 直接用插件图标。
+  // icon 仍要写:老宿主不认 iconFile、读图失败也退到它。只换图标别升 version(宿主见版本变就丢用户保存的布局)。
+  A.match(sp.iconFile, /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.(png|svg)$/i)
+  A.ok(existsSync(join(ROOT, 'spaces/live3d', sp.iconFile)) || existsSync(join(ROOT, sp.iconFile)), `iconFile ${sp.iconFile} 找不到`)
   A.ok(sp.version, '发布必填 version(市场「可更新」检查读它)')
   A.ok(sp.layout.main.length >= 1)
   installDom()
