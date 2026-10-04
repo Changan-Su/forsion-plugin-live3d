@@ -501,6 +501,25 @@ t('reactions: 口型驱动(有 speechLevel 跟真实电平;通话里出字不出
   let z = 1
   for (let i = 60; i < 120; i++) z = d2.step(true, null, i * dt, dt)
   A.ok(z < 0.02, `null source decays: ${z}`)
+  // 挂断(字段消失)时 run 还在说、但没有新字:通话期间攒下的字不许被当成「刚出的」(嘴会弹开一下)
+  const d3 = M.createMouthDriver()
+  let c3 = 0
+  for (let i = 0; i < 30; i++) d3.step(true, st({ textChars: (c3 += 3) }), i * dt, dt) // 先是出字口型
+  for (let i = 30; i < 90; i++) d3.step(true, st({ textChars: (c3 += 5), speechLevel: 0 }), i * dt, dt) // 通话中:出字不出声
+  let pop = 0
+  for (let i = 90; i < 150; i++) pop = Math.max(pop, d3.step(true, st({ textChars: c3 }), i * dt, dt)) // 挂断,没有新字
+  A.ok(pop < 0.02, `hang-up must not replay call-time text: ${pop}`)
+  let again = 0
+  for (let i = 150; i < 210; i++) again = Math.max(again, d3.step(true, st({ textChars: (c3 += 3) }), i * dt, dt))
+  A.ok(again > 0.3, `text path resumes after hang-up: ${again}`)
+  // 峰值按真实时间回落:上一通很响(0.9),隔一分钟来一通轻声的(0.25)照样张得开
+  const d4 = M.createMouthDriver()
+  for (let i = 0; i < 30; i++) d4.step(true, st({ speechLevel: 0.9 }), i * dt, dt)
+  d4.step(false, undefined, 0.6, dt)
+  d4.reset()
+  let quiet = 0
+  for (let i = 0; i < 30; i++) quiet = d4.step(true, st({ speechLevel: 0.25 }), 60 + i * dt, dt)
+  A.ok(quiet > 0.9, `stale peak must not mute a later quiet call: ${quiet}`)
   // 非 speaking 恒 0,且回到通话口型时从 0 起
   A.equal(d.step(false, st({ speechLevel: 0.9 }), 3, dt), 0)
   A.ok(d.step(true, st({ speechLevel: 0.9 }), 3 + dt, dt) < 0.5)

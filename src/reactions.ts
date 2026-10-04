@@ -228,7 +228,9 @@ export interface MouthDriver {
 export function createMouthDriver(): MouthDriver {
   const env = createMouthEnvelope()
   let voiced = 0
+  let byVoice = false
   let peak = 0 // 跨句保留(同一通电话的响度不会一句一变),只随时间回落
+  let peakAt = 0
   return {
     step(speaking, s, t, dt) {
       if (!speaking) {
@@ -237,10 +239,17 @@ export function createMouthDriver(): MouthDriver {
         return 0
       }
       if (typeof s?.speechLevel === 'number') {
-        env.decay(t) // 通话结束切回出字口型时从 0 起
-        peak = speechPeak(peak, s.speechLevel, dt)
+        byVoice = true
+        // 峰值按真实流逝的时间回落(不是按说话的帧数):上一通的大嗓门不许压住一分钟后这通轻声的口型。
+        peak = speechPeak(peak, s.speechLevel, t - peakAt)
+        peakAt = t
         voiced = speechMouth(voiced, s.speechLevel, peak, dt)
         return voiced
+      }
+      // 挂断后切回出字口型:基线重来 —— 通话期间聊天区攒下的字不算「刚出的」(否则嘴会弹开一下)。
+      if (byVoice) {
+        byVoice = false
+        env.reset()
       }
       voiced = 0
       if (s === undefined) env.sample(Math.floor(t * 30), t, 'synthetic')
@@ -251,6 +260,7 @@ export function createMouthDriver(): MouthDriver {
     reset() {
       env.reset()
       voiced = 0
+      byVoice = false
     },
   }
 }
