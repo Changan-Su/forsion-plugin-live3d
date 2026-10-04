@@ -112,6 +112,10 @@ export interface HostCtx {
   desk?: {
     registerCompanion(def: CompanionContribution): CompanionHandle
   }
+  /** 活动日志(喂给 Muse 这类后台 Agent);事件名宿主自动加 `plugin:<id>:` 前缀。 */
+  activity?: {
+    log(event: string, detail?: Record<string, unknown>): void
+  }
 }
 
 /** 旧宿主没有 ctx.app.writeBytes 时的降级口:渲染进程主世界上的 Amadeus 桥(types.ts 承认的 ambient authority)。

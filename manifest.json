@@ -2,11 +2,11 @@
   "id": "live3d",
   "name": "Live3D",
   "nameEn": "Live3D",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "apiVersion": 1,
   "minAppVersion": "2.11.2",
-  "description": "在 Tangu 聊天右侧的 Agent Desk 里放一个 3D 形象(VRM 0.x / 1.0、GLB、glTF、FBX、OBJ),跟着 Agent 的状态做反应:思考时抬眼琢磨,说话时口型随输出一张一合,调工具时低头干活,等你回应时蹦一下,出错时垂头,完成时庆祝。两种显示模式:空闲显示(Desk 上没有文件时出现)与总是显示(完全替换 Desk 的文件展示)。常见格式直接导入,插件自动分析并生成配置;PMX、压缩包、压缩过的模型交给随包的 Live3D Importer Agent 协助转换。没导入模型时显示一个会做表情的小球。全部离线渲染。暂不支持 Live2D(授权原因)。",
-  "descriptionEn": "Puts a 3D avatar (VRM 0.x / 1.0, GLB, glTF, FBX, OBJ) on the Agent Desk to the right of the Tangu chat and makes it react to the agent: it looks up while thinking, its mouth follows the answer as it streams, it looks down at work while a tool runs, hops when it needs you, droops on errors and celebrates when a run finishes. Two display modes: when idle (appears while the Desk has no files) and always (completely replaces the Desk's file presentation). Common formats import directly and get an automatic profile; PMX, archives and compressed models go to the bundled Live3D Importer agent for conversion. Until you import a model, a friendly orb reacts instead. Renders fully offline. Live2D is not supported yet (licence).",
+  "description": "在 Tangu 聊天右侧的 Agent Desk 里放一个 3D 形象(VRM 0.x / 1.0、GLB、glTF、FBX、OBJ),跟着 Agent 的状态做反应:思考时抬眼琢磨,说话时口型随输出一张一合,调工具时低头干活,等你回应时蹦一下,出错时垂头,完成时庆祝。两种显示模式:空闲显示(Desk 上没有文件时出现)与总是显示(完全替换 Desk 的文件展示)。常见格式直接导入,插件自动分析并生成配置;PMX、压缩包、压缩过的模型交给随包的 Live3D Importer Agent 协助转换。没导入模型时显示一个会做表情的小球。左侧功能条的「3D 小屋」Space 是一间三面剖开的小房间:形象住在里面自己过日子,Agent 干活时它去书桌前陪着干;场景(scene.json)可以自己写。还有可选的全屏屏保。全部离线渲染。暂不支持 Live2D(授权原因)。",
+  "descriptionEn": "Puts a 3D avatar (VRM 0.x / 1.0, GLB, glTF, FBX, OBJ) on the Agent Desk to the right of the Tangu chat and makes it react to the agent: it looks up while thinking, its mouth follows the answer as it streams, it looks down at work while a tool runs, hops when it needs you, droops on errors and celebrates when a run finishes. Two display modes: when idle (appears while the Desk has no files) and always (completely replaces the Desk's file presentation). Common formats import directly and get an automatic profile; PMX, archives and compressed models go to the bundled Live3D Importer agent for conversion. Until you import a model, a friendly orb reacts instead. The \"3D room\" Space in the left bar is a cut-away little room where the avatar lives its own day and heads to the desk while the agent works; scenes (scene.json) are yours to write. An optional full-screen screensaver shows the room when you step away. Renders fully offline. Live2D is not supported yet (licence).",
   "main": "main.js",
   "onboarding": {
     "intro": "Live3D 让 Agent Desk 上多一个会看、会说、会干活的 3D 形象 —— Agent 在想、在说、在跑工具、在等你,它都演给你看。",
@@ -30,6 +30,10 @@
       {
         "title": "按自己的口味微调",
         "description": "每个模型文件夹里的 live3d.json 可以手改(动作映射、表情、口型、构图),保存即生效;改坏了模型库会原样列出错误原因。"
+      },
+      {
+        "title": "去 3D 小屋看看",
+        "description": "左侧功能条的「3D 小屋」Space:形象住在房间里,Agent 干活时它去书桌前。在设置 → 插件 → Live3D 里可以换场景、打开空闲屏保;场景文件在工作文件夹的 scenes/ 里,保存即生效。"
       }
     ],
     "en": {
@@ -54,6 +58,10 @@
         {
           "title": "Fine-tune it",
           "description": "Each model folder has a live3d.json you can edit (clip mapping, expressions, lip sync, framing); it reloads on save, and if something is wrong the library shows the exact reason."
+        },
+        {
+          "title": "Visit the 3D room",
+          "description": "The \"3D room\" Space in the left bar: the avatar lives in a little room and heads to the desk while the agent works. In Settings → Plugins → Live3D you can switch scenes and turn on the idle screensaver; scene files live in scenes/ in the work folder and reload on save."
         }
       ]
     },

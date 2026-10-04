@@ -543,3 +543,230 @@
     border-bottom: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.1));
   }
 }
+
+/* ── 3D 小屋(Space 主区视图) ───────────────────────────────────────────────
+ * HUD 叠在 3D 画面上:昼夜两种背景都要读得清,所以用深色半透明胶囊 + 浅色字(不跟宿主明暗走)。
+ * 顶部整条 no-drag:视图在主区,但窄窗口下工具条可能挨着窗口拖拽区。 */
+.l3-room-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.l3-room {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0e1224;
+}
+.l3-room-stage {
+  position: absolute;
+  inset: 0;
+}
+.l3-room-ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(236, 240, 255, 0.72);
+}
+.l3-room-top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+.l3-room-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 46%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(10, 14, 30, 0.46);
+  color: #f4f6ff;
+  pointer-events: auto;
+}
+.l3-room-title b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.l3-room-title span {
+  min-height: 1.5em;
+  font-size: 12px;
+  color: rgba(236, 240, 255, 0.8);
+}
+.l3-room-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+.l3-room-tools .l3-btn,
+.l3-room-select,
+.l3-seg {
+  height: 28px;
+  min-height: 28px;
+  color: #eef1ff;
+  background: rgba(10, 14, 30, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+.l3-room-tools .l3-btn[data-primary] {
+  color: var(--on-accent, #fff);
+  background: var(--accent, #8b7fd6);
+  border-color: transparent;
+}
+.l3-room-tools .l3-btn:hover,
+.l3-room-select:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.l3-room-select {
+  max-width: 200px;
+  padding: 0 8px 0 12px;
+  font: inherit;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.l3-room-select option {
+  color: var(--text, #222);
+  background: var(--bg-card, #fff);
+}
+.l3-seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+}
+.l3-seg-btn {
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  color: rgba(238, 241, 255, 0.82);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.l3-seg-btn.is-on {
+  color: var(--on-accent, #fff);
+  background: var(--accent, #8b7fd6);
+}
+.l3-room-notes {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 48px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+.l3-room-notes:empty {
+  display: none;
+}
+.l3-room-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: #eef1ff;
+  background: rgba(10, 14, 30, 0.46);
+  border-radius: 999px;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+.l3-room-hint.is-gone {
+  opacity: 0;
+}
+
+/* ── 全屏屏保 ───────────────────────────────────────────────────────────────
+ * 覆盖整个窗口(z-index 顶格),no-drag:mac 上窗口顶部一条是拖拽区,不声明那一条点了退不出去。 */
+.l3-saver {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  background: #05070f;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  cursor: none;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+.l3-saver.is-on {
+  opacity: 1;
+}
+.l3-saver-stage {
+  position: absolute;
+  inset: 0;
+}
+.l3-saver-clock {
+  position: absolute;
+  left: 48px;
+  bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #f6f7ff;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.l3-saver-clock b {
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.l3-saver-clock span {
+  font-size: 16px;
+  opacity: 0.82;
+}
+.l3-saver-doing {
+  position: absolute;
+  right: 48px;
+  bottom: 52px;
+  max-width: 40%;
+  font-size: 15px;
+  text-align: right;
+  color: rgba(246, 247, 255, 0.86);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.l3-saver-hint {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: l3-saver-hint 6s ease forwards;
+}
+@keyframes l3-saver-hint {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

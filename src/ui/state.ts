@@ -6,6 +6,8 @@ import { createLibrary, workFolderOf, FOLDER_README, type LibEntry, type Library
 import { serializeProfile } from '../profile'
 import { pick, t } from '../i18n'
 import type { AgentInfo, CompanionMode, HostCtx } from './host'
+import { createSceneLibrary, scenePath, type SceneLibrary } from '../room/sceneLibrary'
+import type { TimeMode } from '../room/scene'
 
 export interface Data {
   mode: CompanionMode
@@ -14,9 +16,16 @@ export interface Data {
   /** 交给 Live3D Importer 的导入:slug → 开始时刻(ms)。它的 live3d.json 出现就自动载入并设为当前。
    *  落盘是为了「agent 还在干活时重启了 app」也能接上。 */
   pending: Record<string, number>
+  /** 3D 小屋(Space / 屏保)用哪个场景:scenes/ 下的文件夹名;null = 自动(有自建场景用第一个,否则内置小屋)。 */
+  scene: string | null
+  /** 小屋的昼夜覆盖;null = 跟场景自己的 time(缺省按本地时间)。 */
+  time: TimeMode | null
+  /** 屏保:空闲多少分钟后启动。缺省关 —— 升级插件的人不该某天读着长文突然被盖住窗口。 */
+  saver: { enabled: boolean; minutes: number }
 }
 
-const DEFAULT_DATA: Data = { mode: 'idle', active: null, pending: {} }
+export const SAVER_MINUTES = [1, 3, 5, 10, 15, 30, 60] as const
+const DEFAULT_DATA: Data = { mode: 'idle', active: null, pending: {}, scene: null, time: null, saver: { enabled: false, minutes: 10 } }
 /** 超过这么久还没写出 live3d.json 的待办就不再轮询(agent 早就放弃了,或用户换了别的办法)。 */
 const PENDING_MAX_MS = 6 * 3600_000
 const PENDING_POLL_MS = 3000
@@ -45,6 +54,7 @@ export interface Busy {
 export interface Shell {
   ctx: HostCtx
   lib: Library
+  scenes: SceneLibrary
   data(): Data
   ready: Promise<void>
   workFolder(): string
@@ -52,6 +62,8 @@ export interface Shell {
   assetUrl(rel: string): string
   setMode(mode: CompanionMode): void
   setActive(slug: string | null): void
+  /** 3D 小屋的设置(场景 / 昼夜 / 屏保)。只改传进来的键。 */
+  setRoom(patch: Partial<Pick<Data, 'scene' | 'time' | 'saver'>>): void
   activeEntry(): LibEntry | null
   /** Desk 该显示的 profile:没有 / 模型文件丢了 → null(小球)。 */
   activeProfile(): ResolvedProfile | null
@@ -72,9 +84,9 @@ export interface Shell {
   setBusy(b: Busy | null): void
   /** 提示:右上角通知 + 模型库顶部提示条(后者带按钮)。 */
   say(level: Notice['level'], text: () => string, action?: NoticeAction): void
-  /** 先落 README(把目录建出来),再在系统文件管理器里选中它。 */
-  openFolder(): Promise<void>
-  ensureReadme(): Promise<boolean>
+  /** 先落 README(把目录建出来),再在系统文件管理器里选中它。缺省 = 工作文件夹;传 folder 就开那个(比如 scenes/)。 */
+  openFolder(folder?: string, readme?: string): Promise<void>
+  ensureReadme(folder?: string, readme?: string): Promise<boolean>
   onChange(cb: () => void): () => void
   emit(): void
   /** 可取消的等待:dispose 时立刻放行(不留悬空定时器)。 */
@@ -97,6 +109,7 @@ export function createShell(ctx: HostCtx): Shell {
 
   const isPending = (slug: string): boolean => Object.prototype.hasOwnProperty.call(data.pending, slug)
   const lib = createLibrary(ctx, isPending)
+  const scenes = createSceneLibrary(ctx)
 
   const save = (): void => {
     try {
@@ -120,15 +133,26 @@ export function createShell(ctx: HostCtx): Shell {
     syncWatch()
     emit()
   })
+  const offScenes = scenes.onChange(() => {
+    syncWatch()
+    emit()
+  })
 
   const ready = Promise.resolve()
     .then(() => ctx.loadData?.<Partial<Data>>())
     .then((v) => {
       if (!v || typeof v !== 'object') return
+      const sv = v.saver && typeof v.saver === 'object' ? v.saver : null
       data = {
         mode: v.mode === 'always' ? 'always' : 'idle',
         active: typeof v.active === 'string' && v.active ? v.active : null,
         pending: v.pending && typeof v.pending === 'object' ? { ...v.pending } : {},
+        scene: typeof v.scene === 'string' && v.scene ? v.scene : null,
+        time: v.time === 'day' || v.time === 'night' || v.time === 'auto' ? v.time : null,
+        saver: {
+          enabled: sv?.enabled === true,
+          minutes: (SAVER_MINUTES as readonly number[]).includes(Number(sv?.minutes)) ? Number(sv?.minutes) : DEFAULT_DATA.saver.minutes,
+        },
       }
     })
     .catch(() => {})
@@ -151,6 +175,10 @@ export function createShell(ctx: HostCtx): Shell {
     // 绑给 Agent 的那些也要盯着:调姿势(pose)天生是「让 agent 改一个数、立刻看一眼」的来回,
     // 只盯「默认形象」的话,正在 Desk 上显示的那份反而不会热更新。
     for (const e of lib.state().entries) if (e.profile.agents.length) want.add(e.profilePath)
+    // 小屋正在用的场景:改 scene.json 保存即生效(和改 live3d.json 一样)
+    for (const e of scenes.state().entries) if (!data.scene || e.slug === data.scene) want.add(scenePath(ctx, e.slug))
+    // 写坏了的场景也盯着:改好保存那一刻重扫(否则它进了问题清单就再也等不到变化)
+    for (const p of scenes.state().problems) want.add(p.path)
     for (const [p, off] of watches) {
       if (!want.has(p)) {
         off()
@@ -244,6 +272,7 @@ export function createShell(ctx: HostCtx): Shell {
   const shell: Shell = {
     ctx,
     lib,
+    scenes,
     data: () => data,
     ready,
     workFolder: () => workFolderOf(ctx),
@@ -267,6 +296,28 @@ export function createShell(ctx: HostCtx): Shell {
       const next = slug || null
       if (data.active === next) return
       data.active = next
+      save()
+      syncWatch()
+      emit()
+    },
+    setRoom(patch) {
+      let changed = false
+      if ('scene' in patch && patch.scene !== data.scene) {
+        data.scene = patch.scene ?? null
+        changed = true
+      }
+      if ('time' in patch && patch.time !== data.time) {
+        data.time = patch.time ?? null
+        changed = true
+      }
+      if (patch.saver) {
+        const next = { ...data.saver, ...patch.saver }
+        if (next.enabled !== data.saver.enabled || next.minutes !== data.saver.minutes) {
+          data.saver = next
+          changed = true
+        }
+      }
+      if (!changed) return
       save()
       syncWatch()
       emit()
@@ -311,7 +362,7 @@ export function createShell(ctx: HostCtx): Shell {
       return true
     },
     async refresh(force = false) {
-      await lib.refresh(force)
+      await Promise.all([lib.refresh(force), scenes.refresh(force)])
     },
     addPending(slug) {
       data.pending[slug] = Date.now()
@@ -340,21 +391,21 @@ export function createShell(ctx: HostCtx): Shell {
       notice = { level, text, ...(action ? { action } : {}) }
       emit()
     },
-    async ensureReadme() {
-      const guide = `${workFolderOf(ctx)}/README.md`
+    async ensureReadme(folder, readme) {
+      const guide = `${folder ?? workFolderOf(ctx)}/README.md`
       try {
         if ((await ctx.app.readFile?.(guide)) == null) {
           if (!ctx.app.writeFile) return false
-          await ctx.app.writeFile(guide, FOLDER_README)
+          await ctx.app.writeFile(guide, readme ?? FOLDER_README)
         }
         return true
       } catch {
         return false
       }
     },
-    async openFolder() {
-      const home = workFolderOf(ctx)
-      const okReadme = await shell.ensureReadme()
+    async openFolder(folder, readme) {
+      const home = folder ?? workFolderOf(ctx)
+      const okReadme = await shell.ensureReadme(home, folder ? readme : undefined)
       if (!okReadme) {
         // 目录也不存在的话 reveal 是**静默无反应** —— 必须出声,一颗点了没反应的按钮比没有按钮更难查。
         shell.say('warning', () => t('import.folderFailed', { folder: home }))
@@ -399,6 +450,7 @@ export function createShell(ctx: HostCtx): Shell {
       if (disposed) return
       disposed = true
       offLib()
+      offScenes()
       for (const off of watches.values()) {
         try {
           off()
@@ -420,6 +472,7 @@ export function createShell(ctx: HostCtx): Shell {
   // 库根变了(库惰性恢复 / 换库)→ 重扫。只比对字符串,很便宜。
   shell.every(STALE_POLL_MS, () => {
     if (lib.stale()) void lib.refresh()
+    if (scenes.stale()) void scenes.refresh()
   })
   return shell
 }

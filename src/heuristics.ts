@@ -140,6 +140,7 @@ export function findMorphs(kind: MorphKind, names: readonly string[]): string[] 
 export type RigRole =
   | 'hips' | 'spine' | 'chest' | 'neck' | 'head'
   | 'leftUpperArm' | 'rightUpperArm' | 'leftLowerArm' | 'rightLowerArm' | 'leftHand' | 'rightHand'
+  | 'leftUpperLeg' | 'rightUpperLeg' | 'leftLowerLeg' | 'rightLowerLeg' | 'leftFoot' | 'rightFoot'
 
 const MX = 'mixamorig\\d*[:_]?'
 const L = '(?:[._ ]?l|[._ ]?left)'
@@ -159,6 +160,15 @@ export const BONE_RULES: Record<RigRole, RegExp[]> = {
   rightLowerArm: [new RegExp(`^${MX}RightForeArm$`, 'i'), /^J_Bip_R_LowerArm$/i, new RegExp(`^(right[ _]?(fore|lower)[ _]?arm|(fore|lower)[ _]?arm${R}|r[ _]?(fore|lower)[ _]?arm|bip0?1[ _]?r[ _]?forearm)$`, 'i'), /^右ひじ$/, /^ひじ\.?R$/],
   leftHand: [new RegExp(`^${MX}LeftHand$`, 'i'), /^J_Bip_L_Hand$/i, new RegExp(`^(left[ _]?hand|hand${L}|l[ _]?hand|bip0?1[ _]?l[ _]?hand)$`, 'i'), /^左手首$/, /^手首\.?L$/],
   rightHand: [new RegExp(`^${MX}RightHand$`, 'i'), /^J_Bip_R_Hand$/i, new RegExp(`^(right[ _]?hand|hand${R}|r[ _]?hand|bip0?1[ _]?r[ _]?hand)$`, 'i'), /^右手首$/, /^手首\.?R$/],
+  // 腿(场景里走路 / 坐 / 躺用)。⚠️MMD 一律整名锚定:`左足D`(付与骨)、`左足ＩＫ`、`左足IK親` 都不能被当成大腿 ——
+  // 程序化只转 FK 骨,付与骨由 LoadedModel.afterPose 跟上。Mixamo 的 `LeftLeg` 是**小腿**(大腿叫 `LeftUpLeg`),
+  // 所以通用写法里 `left leg` 归小腿,大腿只认 up / upper / thigh。
+  leftUpperLeg: [new RegExp(`^${MX}LeftUpLeg$`, 'i'), /^J_Bip_L_UpperLeg$/i, new RegExp(`^(left[ _]?up(per)?[ _]?leg|up(per)?[ _]?leg${L}|thigh${L}|l[ _]?thigh|left[ _]?thigh|bip0?1[ _]?l[ _]?thigh)$`, 'i'), /^左足$/, /^足\.?L$/],
+  rightUpperLeg: [new RegExp(`^${MX}RightUpLeg$`, 'i'), /^J_Bip_R_UpperLeg$/i, new RegExp(`^(right[ _]?up(per)?[ _]?leg|up(per)?[ _]?leg${R}|thigh${R}|r[ _]?thigh|right[ _]?thigh|bip0?1[ _]?r[ _]?thigh)$`, 'i'), /^右足$/, /^足\.?R$/],
+  leftLowerLeg: [new RegExp(`^${MX}LeftLeg$`, 'i'), /^J_Bip_L_LowerLeg$/i, new RegExp(`^(left[ _]?(lower[ _]?)?leg|lower[ _]?leg${L}|(shin|calf|knee)${L}|l[ _]?(shin|calf)|left[ _]?(shin|calf|knee)|bip0?1[ _]?l[ _]?calf)$`, 'i'), /^左ひざ$/, /^ひざ\.?L$/],
+  rightLowerLeg: [new RegExp(`^${MX}RightLeg$`, 'i'), /^J_Bip_R_LowerLeg$/i, new RegExp(`^(right[ _]?(lower[ _]?)?leg|lower[ _]?leg${R}|(shin|calf|knee)${R}|r[ _]?(shin|calf)|right[ _]?(shin|calf|knee)|bip0?1[ _]?r[ _]?calf)$`, 'i'), /^右ひざ$/, /^ひざ\.?R$/],
+  leftFoot: [new RegExp(`^${MX}LeftFoot$`, 'i'), /^J_Bip_L_Foot$/i, new RegExp(`^(left[ _]?(foot|ankle)|(foot|ankle)${L}|l[ _]?foot|bip0?1[ _]?l[ _]?foot)$`, 'i'), /^左足首$/, /^足首\.?L$/],
+  rightFoot: [new RegExp(`^${MX}RightFoot$`, 'i'), /^J_Bip_R_Foot$/i, new RegExp(`^(right[ _]?(foot|ankle)|(foot|ankle)${R}|r[ _]?foot|bip0?1[ _]?r[ _]?foot)$`, 'i'), /^右足首$/, /^足首\.?R$/],
 }
 
 /** 在骨骼名单里找各部位(每个部位取优先级最高、名单里最靠前的那根)。 */

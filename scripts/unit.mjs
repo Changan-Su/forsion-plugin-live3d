@@ -25,6 +25,11 @@ await build({
       .concat([
         "export { resolveModelRef, routeModelRef, embeddedGltfToGlb, gltfRequiredExtensions, gltfBlockingExtensions, LoadError, toMsg } from './src/loaders.ts'",
         "export { frameDelta } from './src/stage.ts'",
+        "export * from './src/room/scene.ts'",
+        "export * from './src/room/nav.ts'",
+        "export * from './src/room/brain.ts'",
+        "export { POSE_TABLE, createAnimator } from './src/room/poses.ts'",
+        "export { builtinScene } from './src/room/presets.ts'",
       ]).join('\n'),
     resolveDir: srcRoot,
     loader: 'ts',
@@ -553,6 +558,246 @@ t('loaders: LoadError / toMsg 双语', () => {
   const m = M.toMsg(new Error('boom'))
   A.equal(m.code, 'parse-failed')
   A.ok(HAN.test(m.zh) && !HAN.test(m.en))
+})
+
+// ── 3D 小屋:场景 / 寻路 / 行为 / 姿势 ──────────────────────────────────────────
+const SCENE = {
+  live3d: 1, name: { zh: '测试间', en: 'Test room' }, character: 'my-avatar', height: 1.25, time: 'night',
+  room: { width: 4, depth: 4, height: 2.6, windows: [{ wall: 'right', at: 0.5, width: 1.4, height: 1.2, sill: 0.8 }] },
+  props: [
+    { type: 'bed', id: 'bed', at: [-1.4, -0.9] },
+    { type: 'desk', id: 'desk', at: [0.6, -1.38] },
+    { type: 'rug', id: 'rug', at: [0.2, 0.6] },
+  ],
+  activities: [
+    { id: 'nap', at: 'bed', pose: 'sleep', time: [5, 5], weight: 1, emote: 'zzz', then: 'wake' },
+    { id: 'wake', at: 'here', pose: 'stretch', time: 1, weight: 0, chained: true },
+    { id: 'read', at: 'desk', pose: 'sit-read', time: [5, 5], weight: 1, label: { zh: '看书', en: 'Reading' } },
+    { id: 'sun', at: 'rug', pose: 'sunbathe', time: 5, weight: 1, when: 'day' },
+  ],
+}
+const scene = (patch = {}) => M.parseScene(JSON.stringify({ ...SCENE, ...patch }), 'Live3D/scenes/t', 't')
+t('scene: 合法场景补齐缺省(内置 Agent 阶段映射、窗户)、name / label 双语对象照收', () => {
+  const r = scene()
+  A.ok(r.ok, r.zh)
+  A.equal(r.value.slug, 't')
+  A.equal(r.value.character, 'my-avatar')
+  A.equal(r.value.agent.thinking, '@think')
+  A.deepEqual(r.value.name, { zh: '测试间', en: 'Test room' })
+  A.equal(M.pickLabel(r.value.activities[2].label, 'en'), 'Reading')
+  A.equal(M.pickLabel({ zh: '只有中文' }, 'en'), '只有中文')
+  A.deepEqual(r.value.activities[1].time, [1, 1])
+})
+t('scene: 错误给双语、能照着改的人话(姿势名 / then 断链 / 窗比墙宽 / 坐标 / 阶段名 / 版本)', () => {
+  const bad = [
+    [{ activities: [{ id: 'x', at: 'bed', pose: 'fly' }] }, /pose/],
+    [{ activities: [{ id: 'x', at: 'bed', pose: 'sleep', then: 'nope' }] }, /then/],
+    [{ room: { width: 3, windows: [{ wall: 'right', width: 3 }] } }, /窗/],
+    [{ props: [{ type: 'bed', at: [1] }] }, /\[x, z\]/],
+    [{ agent: { idle: 'read' } }, /agent/],
+    [{ live3d: 2 }, /live3d/],
+    [{ props: [{ type: 'bed', id: 'window', at: [0, 0] }] }, /保留字|reserved/],
+  ]
+  for (const [patch, re] of bad) {
+    const r = scene(patch)
+    A.equal(r.ok, false, JSON.stringify(patch))
+    A.match(r.zh + r.en, re)
+    A.ok(HAN.test(r.zh) && !HAN.test(r.en), r.en)
+  }
+  const w = scene({ props: [{ type: 'spaceship', at: [0, 0] }] })
+  A.ok(w.ok && w.warnings.some((x) => /spaceship/.test(x.en)), '不认识的道具类型应跳过并警告,不是报错')
+  // 原型链上的名字不是道具类型(按普通对象查表会拿到 Object.prototype,后面算坐标全是 NaN)
+  for (const type of ['__proto__', 'constructor', 'toString']) {
+    const r = scene({ props: [{ type, at: [0, 0] }] })
+    A.ok(r.ok && r.value.props.length === 0, `道具类型 ${type} 被当真了`)
+  }
+})
+t('scene: 内置小屋过得了自己的校验;每种道具都登记了尺寸 / 锚点;每个姿势都有动作', () => {
+  const b = M.builtinScene()
+  A.ok(b.props.length > 3 && b.activities.length > 3)
+  for (const [type, info] of Object.entries(M.PROP_INFO)) {
+    A.ok(Array.isArray(info.half) && info.half.every(Number.isFinite), type)
+    for (const a of Object.values(info.anchors)) A.ok([a.x, a.z, a.face].every(Number.isFinite), type)
+  }
+  for (const p of M.POSES) A.equal(typeof M.POSE_TABLE[p], 'function', `姿势 ${p} 没有动作`)
+})
+t('scene: isNight —— auto 按本地时间(18:30 起到 6:00 是夜),day / night 固定', () => {
+  const at = (h, m = 0) => new Date(2026, 8, 26, h, m)
+  A.equal(M.isNight('auto', at(12)), false)
+  A.equal(M.isNight('auto', at(18, 29)), false)
+  A.equal(M.isNight('auto', at(18, 30)), true)
+  A.equal(M.isNight('auto', at(5, 59)), true)
+  A.equal(M.isNight('day', at(23)), false)
+  A.equal(M.isNight('night', at(12)), true)
+})
+t('nav: 绕开障碍(路上每一段都走得通)、起点在障碍里先挪出来、围死 → null、旋转的障碍按旋转后的占地挡', () => {
+  const g = M.buildGrid(4, 4, [{ x: 0, z: 0, hx: 0.4, hz: 1.4, rot: 0 }], 0.15)
+  const p = M.findPath(g, [-1.5, 0], [1.5, 0])
+  A.ok(p && p.length >= 3, '直线穿过障碍了')
+  for (let i = 1; i < p.length; i++) A.ok(M.lineFree(g, p[i - 1], p[i]), `第 ${i} 段穿墙`)
+  const inside = M.findPath(g, [0, 0], [1.5, 1.5])
+  A.deepEqual(inside[0], [0, 0])
+  A.ok(M.isFree(g, inside[1]), '起点在障碍里时,第二个点应是挪出来的空地')
+  const wall = M.buildGrid(4, 4, [{ x: 0, z: 0, hx: 0.3, hz: 2.5, rot: 0 }], 0.15)
+  A.equal(M.findPath(wall, [-1.5, 0], [1.5, 0]), null)
+  const rot = M.buildGrid(4, 4, [{ x: 0, z: 0, hx: 1.2, hz: 0.2, rot: Math.PI / 2 }], 0.1)
+  A.equal(M.isFree(rot, [0, 1]), false, '转 90° 后长边沿 Z,(0,1) 应被挡')
+  A.equal(M.isFree(rot, [1, 0]), true)
+})
+
+/** 跑大脑直到条件成立(dt = 50ms,最多 maxS 秒);返回用了多少秒。 */
+function runUntil(b, cond, maxS = 60, onFrame) {
+  for (let s = 0; s < maxS; s += 0.05) {
+    const fr = b.update(0.05)
+    onFrame?.(fr)
+    if (cond(fr)) return s
+  }
+  return -1
+}
+const mkBrain = (sc, night = true) => {
+  let seed = 7
+  const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const obs = sc.props.filter((p) => M.PROP_INFO[p.type].half[0]).map((p) => ({ x: p.at[0], z: p.at[1], hx: M.PROP_INFO[p.type].half[0], hz: M.PROP_INFO[p.type].half[1], rot: (p.rot * Math.PI) / 180 }))
+  const grid = M.buildGrid(sc.room.width, sc.room.depth, obs, 0.17)
+  return { b: M.createBrain({ scene: sc, grid, camera: () => [8, 8], night: () => night, rng }), grid }
+}
+t('brain: 叫去睡觉 → 走过去(不穿家具)→ 躺下(lie、settle=1)→ 睡够接 then(原地伸懒腰,不下床)', () => {
+  const sc = scene().value
+  const { b, grid } = mkBrain(sc)
+  b.force('nap')
+  let crossed = 0
+  const s = runUntil(b, (fr) => fr.mode === 'do' && b.current() === 'nap', 60, (fr) => {
+    if (fr.mode === 'walk' && !M.isFree(grid, [fr.x, fr.z]) && M.nearestFree(grid, [fr.x, fr.z]) && Math.hypot(fr.x - sc.props[0].at[0], fr.z - sc.props[0].at[1]) > 1.2) crossed++
+  })
+  A.ok(s >= 0, '一分钟内没躺上床')
+  A.equal(crossed, 0, '走路途中穿过了家具')
+  const fr = b.frame()
+  A.equal(fr.stance, 'lie')
+  A.equal(fr.settle, 1)
+  A.equal(fr.emote, 'zzz')
+  A.ok(runUntil(b, () => b.current() === 'wake', 10) >= 0, '睡醒没接 then')
+  A.equal(b.frame().stance, 'lie', '「here」活动不该让人下床')
+})
+t('brain: Agent 阶段插队 —— thinking 起身去书桌;thinking→tool 同一张桌子原地换动作(不起身);回 idle 后回到日常', () => {
+  const sc = scene().value
+  const { b } = mkBrain(sc)
+  b.force('nap')
+  runUntil(b, () => b.current() === 'nap', 60)
+  b.force(null)
+  b.setPhase('thinking')
+  A.equal(b.frame().mode, 'exit', '躺着被叫去干活应先起身')
+  A.ok(runUntil(b, () => b.current() === '@think', 60) >= 0, '没走到书桌去想事情')
+  A.equal(b.frame().stance, 'sit')
+  b.setPhase('tool')
+  b.update(0.05)
+  A.equal(b.current(), '@work', '同一张桌子应原地换成干活')
+  A.equal(b.frame().mode, 'do')
+  // 阶段不变就一直干(内置活动 4s 一轮,到点只续不走)
+  A.equal(runUntil(b, (fr) => fr.mode !== 'do' || b.current() !== '@work', 12), -1, '阶段没变却自己走开了')
+  b.setPhase('idle')
+  A.ok(runUntil(b, () => !!b.current() && !b.current().startsWith('@'), 30) >= 0, '回 idle 后没回到日常')
+})
+t('brain: 戳一下 —— 睡着时是被吵醒(@woken,不爽)再打哈欠;醒着是打招呼(@poke)', () => {
+  const sc = scene().value
+  const { b } = mkBrain(sc)
+  b.force('nap')
+  runUntil(b, () => b.current() === 'nap', 60)
+  b.poke()
+  A.equal(b.current(), '@woken')
+  A.equal(b.frame().emote, 'anger')
+  A.ok(runUntil(b, () => b.current() === '@yawn', 5) >= 0, '被吵醒后没打哈欠')
+  const { b: b2 } = mkBrain(sc)
+  b2.force('read') // 醒着:坐在书桌前看书
+  A.ok(runUntil(b2, () => b2.current() === 'read', 60) >= 0)
+  b2.poke()
+  A.equal(b2.current(), '@poke')
+})
+t('brain: at 里的锚点名只认自有键("bed.__proto__" 不是锚点 → 这个活动做不了,不参加抽签,更不会走到 NaN 去)', () => {
+  const sc = scene({ activities: [{ id: 'evil', at: 'bed.__proto__', pose: 'sleep', time: 3, weight: 50 }, { id: 'ok', at: 'center', pose: 'stand', time: 3, weight: 1 }] }).value
+  const { b } = mkBrain(sc)
+  let nan = 0
+  const seen = new Set()
+  runUntil(b, () => false, 30, (fr) => {
+    if (!Number.isFinite(fr.x) || !Number.isFinite(fr.z) || !Number.isFinite(fr.yaw)) nan++
+    if (b.current()) seen.add(b.current())
+  })
+  A.equal(nan, 0, '坐标出现 NaN')
+  A.ok(!seen.has('evil'))
+})
+t('brain: Agent 干活时被戳一下 → 打完招呼回去接着干(钉住的活动要恢复)', () => {
+  const sc = scene().value
+  const { b } = mkBrain(sc)
+  b.setPhase('tool')
+  A.ok(runUntil(b, () => b.current() === '@work', 60) >= 0)
+  b.poke()
+  A.equal(b.current(), '@poke')
+  A.ok(runUntil(b, () => b.current() === '@work', 6) >= 0, '戳完没回去干活(阶段还是 tool)')
+})
+t('brain: 走去书桌的路上阶段回 idle → 改去过日子,不把过期的 agent 活动做完', () => {
+  const sc = scene().value
+  const { b } = mkBrain(sc)
+  runUntil(b, () => !!b.current(), 30)
+  b.setPhase('thinking')
+  A.ok(runUntil(b, (fr) => fr.mode === 'walk', 10) >= 0, '没开始走')
+  b.setPhase('idle')
+  let did = false
+  runUntil(b, () => false, 20, () => { if (b.current() === '@think') did = true })
+  A.ok(!did, '阶段早就回 idle 了,还是走到书桌做了 @think')
+})
+t('brain: 躺着被叫去干活、起身途中阶段回 idle → 起身完改去过日子,不卡在 exit、不去书桌', () => {
+  const sc = scene().value
+  const { b } = mkBrain(sc)
+  b.force('nap')
+  A.ok(runUntil(b, () => b.current() === 'nap', 60) >= 0)
+  b.force(null)
+  b.setPhase('thinking')
+  A.equal(b.frame().mode, 'exit')
+  b.setPhase('idle')
+  let think = false
+  const s = runUntil(b, () => b.frame().mode === 'do' && !!b.current() && b.current() !== 'nap', 20, () => { if (b.current() === '@think') think = true })
+  A.ok(s >= 0, '起身后卡住了(一直没挑到新的事)')
+  A.ok(!think, '阶段早回 idle 了还去书桌做了 @think')
+})
+t('brain: 从窗边走去书桌的路上被叫住说话 → 原地说;说完被派回窗边时要真的走回去(旧锚点不算「就在这里」)', () => {
+  const sc = scene({ activities: [...SCENE.activities, { id: 'look', at: 'window', pose: 'gaze', time: [6, 6], weight: 0, chained: true }] }).value
+  const { b } = mkBrain(sc)
+  b.force('look')
+  A.ok(runUntil(b, () => b.current() === 'look', 60) >= 0, '没走到窗边')
+  const win = { x: b.frame().x, z: b.frame().z }
+  b.force('read')
+  A.ok(runUntil(b, (fr) => fr.mode === 'walk' && Math.hypot(fr.x - win.x, fr.z - win.z) > 0.6, 30) >= 0, '没走远')
+  const mid = { x: b.frame().x, z: b.frame().z }
+  b.setPhase('speaking')
+  A.equal(b.current(), '@talk')
+  A.ok(Math.hypot(b.frame().x - mid.x, b.frame().z - mid.z) < 0.05, '说话时应停在原地')
+  b.force('look')
+  b.setPhase('idle')
+  A.ok(runUntil(b, () => b.current() === 'look', 60) >= 0, '说完没回窗边')
+  A.ok(Math.hypot(b.frame().x - win.x, b.frame().z - win.z) < 0.2, `在半路就「看起窗外」了:(${b.frame().x.toFixed(2)}, ${b.frame().z.toFixed(2)}) vs 窗边 (${win.x.toFixed(2)}, ${win.z.toFixed(2)})`)
+})
+t('brain: 白天才做的活动只在白天抽到;场景里没有的道具 → 那个活动不参加抽签', () => {
+  const sc = scene({ activities: [{ id: 'sun', at: 'rug', pose: 'sunbathe', time: 3, weight: 1, when: 'day' }, { id: 'ghost', at: 'piano', pose: 'piano', time: 3, weight: 50 }, { id: 'stand', at: 'center', pose: 'stand', time: 3, weight: 1 }] }).value
+  const seen = new Set()
+  const { b } = mkBrain(sc, true)
+  runUntil(b, () => false, 60, () => b.current() && seen.add(b.current()))
+  A.ok(!seen.has('sun'), '夜里抽到了白天的活动')
+  A.ok(!seen.has('ghost'), '抽到了场景里没有道具的活动')
+  A.ok(seen.has('stand'))
+})
+t('poses: 坐下时髋落在座面上(Q 版腿短 → 整个人被抬起来);躺平时仰倒 90°、根退半个身长;走路有腿的摆动', () => {
+  const an = M.createAnimator({ height: 1.25, hipY: 0.2, back: 0.11 })
+  const base = { walk: 0, speed: 0, poseT: 1, activity: null, emote: null, look: null, mode: 'do' }
+  const sit = an.step({ ...base, x: 0, z: 0, yaw: 0, stance: 'sit', settle: 1, seatY: 0.36, pose: 'sit' }, 0.016, 1)
+  A.ok(Math.abs(sit.root.y - (0.36 - 0.2 + 0.015)) < 1e-6, `坐姿根高 ${sit.root.y}`)
+  A.ok(sit.body.legL && sit.body.legL.thigh[0] < -1, '坐着大腿应抬平')
+  // 头朝 -Z(face = π)→ 身体偏航 = face + π = 0
+  const lie = an.step({ ...base, x: 0, z: 0, yaw: M.bodyYaw(Math.PI, 'lie') % (2 * Math.PI), stance: 'lie', settle: 1, seatY: 0.38, pose: 'sleep' }, 0.016, 1)
+  A.ok(Math.abs(lie.root.pitch + Math.PI / 2) < 1e-6)
+  A.ok(Math.abs(lie.root.y - (0.38 + 0.11)) < 1e-6, `躺姿根高 ${lie.root.y}`)
+  A.ok(Math.abs(lie.root.z - 0.625) < 1e-6, `头朝 -Z 时脚(根)应在 +Z 半个身长:${lie.root.z}`)
+  const w1 = an.step({ ...base, x: 0, z: 0, yaw: 0, stance: 'stand', settle: 0, seatY: 0, pose: 'stand', walk: 1, speed: 0.5, mode: 'walk' }, 0.1, 2)
+  const w2 = an.step({ ...base, x: 0, z: 0, yaw: 0, stance: 'stand', settle: 0, seatY: 0, pose: 'stand', walk: 1, speed: 0.5, mode: 'walk' }, 0.1, 2.1)
+  A.ok(w1.body.legL && w2.body.legL && w1.body.legL.thigh[0] !== w2.body.legL.thigh[0], '走路时腿没摆')
 })
 
 console.log(`\n${total - fail.length}/${total} passed`)

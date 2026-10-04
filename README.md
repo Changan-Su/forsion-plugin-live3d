@@ -21,6 +21,17 @@
 
 在 设置 → 插件 → Live3D 里切换,或命令面板「Live3D:切换显示模式」。
 
+## 3D 小屋(独立 Space)与屏保
+
+左侧功能条多了一个 **「3D 小屋」** Space(插件包里的 `spaces/live3d/space.json`):主区是一间三面剖开的小房间,右侧是聊天。形象住在房间里**自己过日子** —— 按场景里写的日常走来走去、坐下看书、躺上床睡觉、弹琴、用望远镜看星星……;Agent 一开始干活,它就起身去书桌前:思考时托腮、调工具时埋头干活、说话时在椅子上转过来对着你、等你回应时走到跟前招手、完成时欢呼、出错时叹气。
+
+- **场景**是数据:`scenes/<名字>/scene.json` —— 房间尺寸 / 墙色 / 窗户、道具(床、书桌、钢琴、望远镜、书架、照片墙、剑架、鱼竿、小鸟、星辰花……共 24 种,全部程序化建模,不带外部资源)、活动(在哪、什么姿势、多久、权重、昼夜、头顶的 Zzz / 星星 / 音符、做完接什么)、Agent 各阶段做哪个活动。保存即生效;格式速查在 `scenes/README.md`(点「场景文件夹」会自动写出来)。没有自建场景时用内置小屋。
+- `character` 写模型库里的文件夹名 = 这间房的住客;不写 = 和 Desk 同一套规矩(当前对话的 Agent 绑了哪个形象,没绑用默认形象)。
+- 昼夜:缺省按本地时间(18:30–6:00 是夜);白天阳光、夜里月光从窗洞斜照进来,夜里台灯点亮。小屋右上角可以固定白天 / 夜晚。
+- 交互:拖动转视角、滚轮缩放、双击复位;点一下角色 —— 醒着冲你打招呼,睡着的会被吵醒(皱眉、打哈欠)。
+- **屏保**:设置 → Live3D → 「3D 小屋与屏保」里打开「空闲时显示屏保」(缺省关)。Forsion 窗口在前台、若干分钟没有键盘鼠标操作 → 铺满窗口显示小屋,镜头缓慢环绕,角落一只大钟;按任意键 / 点一下 / 移动鼠标即返回(叫醒它的那个键不会打进输入框)。手动启动(小屋里的「屏保」按钮或命令面板)会进入系统全屏。
+- 小屋与屏保共用一块画布(模型只加载一次);全插件同时最多一个房间舞台。
+
 ## 导入模型
 
 支持 **VRM 0.x / 1.0、GLB、glTF(含外部 .bin / 贴图)、FBX、OBJ(+ MTL)、PMX / PMD(MMD,贴图文件夹原样保留;不含物理与 .vmd 动作)**,动作可以额外带 **.vrma**(VRM 动画)。
@@ -42,6 +53,8 @@ Live3D/
     analysis.json   导入时的体检结果
     preview.png     缩略图
     <模型文件、贴图、.bin、动作文件>
+  scenes/<slug>/
+    scene.json      3D 小屋的场景(可手改,保存即重载)
 ```
 
 `live3d.json` 的字段:`live3d`(固定为 1)、`name`、`model`、`motions`、`agents`、`transform`(`scale` / `rotateY` / `offsetY` / `upAxis`)、`framing`(`bust` / `full` / `face`)、`states`(按 `idle` / `thinking` / `speaking` / `tool` / `waiting` / `error` / `done` 配 `clip` / `expression` / `weight` / `mouth` / `once`)、`pose`(`armSpread` / `armForward` / `elbow` / `liveliness`)。完整说明见 `skills/live3d-import/SKILL.md`。写坏了,模型库会原样列出错误原因。
@@ -58,6 +71,8 @@ Live3D/
 | Live3D:导入 3D 模型… | 直接导入 |
 | Live3D:让 Agent 协助导入… | 交给 Live3D Importer |
 | Live3D:切换显示模式 | 空闲显示 ↔ 总是显示 |
+| Live3D:打开 3D 小屋 | 打开小屋视图(也可以点左侧功能条的「3D 小屋」Space) |
+| Live3D:启动屏保 | 立刻进入全屏屏保 |
 | Live3D:刷新模型库 | 重新扫描工作文件夹 |
 
 ## 宿主要求与已知限制
@@ -80,6 +95,9 @@ LIVE3D_SAMPLES=… npm run smoke:shell            # 真 Chromium 插件壳冒烟
 LIVE3D_MAIN=<旧 main.js> npm run smoke:shell     # 负对照:新加的壳断言必须红
 LIVE3D_SAMPLES=… npm run live:agent             # 真模型 live 台架:真引擎装载捆绑包(全局技能 + live3d-importer),七个夹具 —— 导入 RobotExpressive、拒收 Live2D、解 MMD 压缩包、用户自建 Agent 从下载目录导入、自己截图看形象、把形象绑给某个 Agent、被说「站得像木头人」去调 pose(改 skills/ / agents/ 或提示词后跑;烧订阅额度,--model 可换)
 LIVE3D_SRC_ROOT=<旧源码目录> node scripts/unit.mjs   # 负对照:旧源码拷进本仓一个目录(如 .negctl/,否则解析不到 three),新加的用例必须在那边红
+LIVE3D_SCRATCH=… node scripts/room-smoke.mjs --vault <笔记库> --scene Live3D/scenes/<名字>/scene.json --shots night:nap,day:sunbathe,night:phase=thinking --view 90,18,3
+                                                 # 房间台架:逐个强制活动,等角色走到位再截全景 + 特写(+ --view 指定方位的正面图)
+node scripts/room-shell-smoke.mjs --vault <笔记库> --scene <名字>   # 整包冒烟:main.js 挂小屋视图 → Agent 思考 / 干活 / 说话 → 切白天 → 屏保进出(库只读)
 npm run icon                                     # 重新生成 icon.png
 sh install.sh        # 装到 ~/.forsion-dev(prod:sh install.sh prod)
 ```
@@ -91,6 +109,8 @@ sh install.sh        # 装到 ~/.forsion-dev(prod:sh install.sh prod)
 **Live3D** puts a 3D avatar on the **Agent Desk** to the right of the Tangu chat and makes it react to the agent: idle breathing and eyes that follow the pointer, looking up while thinking, lip sync that follows the streamed answer, looking down while a tool runs, a hop when it needs you, a droop on errors and a small celebration when a run finishes. Clips and expressions that come with the model (Idle / Talk / Typing / Wave / Cheer…, VRM happy / sad / aa…) are matched to these states automatically. Until you import a model, a friendly orb reacts instead. Everything renders offline.
 
 **Display modes.** *When idle* (default): shown only while the Desk has nothing on it (a draft chat, an empty session, or after "Clear Desk"); it steps aside when the agent presents a file. *Always*: completely replaces the Agent Desk file presentation — the card and the expanded panel show only the avatar, and files the agent presents, edit auto-show and chat citations open in a new tab instead.
+
+**3D room and screensaver.** A new **"3D room"** Space in the left bar (bundled as `spaces/live3d/space.json`): the main area is a cut-away little room, the chat sits on the right. The avatar lives there and goes about its day — wandering, reading, napping in bed, playing the piano, stargazing through a telescope — and heads to the desk when the agent works: chin in hand while thinking, busy while a tool runs, swivelling round to face you while it speaks, walking up to wave when it needs you, cheering when done, sighing on errors. Scenes are data (`scenes/<name>/scene.json`: room size, wall colours, windows, 24 procedural prop types, activities with where / pose / duration / weight / day or night / emote / what comes next, and which activity each agent phase triggers); saving reloads the room, and a quick reference is written to `scenes/README.md`. `character` names the resident model folder; without it the room follows the Desk rules. Day and night follow the local clock (sunlight or moonlight through the window, desk lamps at night) or can be pinned. Drag to turn, scroll to zoom, double-click to reset, click the character to poke it (a sleeping one wakes up grumpy). **Screensaver**: turn on "Show the screensaver when idle" in the settings (off by default); after a few minutes without keyboard or mouse input while Forsion is in front, the room fills the window with a slowly orbiting camera and a clock. Any key, click or mouse movement brings you back, and the key that woke it never reaches the page. Starting it by hand (the room's button or the command palette) goes full screen.
 
 **Import.** VRM 0.x / 1.0, GLB, glTF (with external .bin and textures), FBX, OBJ (+ MTL) and PMX / PMD (MMD; texture folders kept as they are, no physics or .vmd motions), plus .vrma motions.
 - *Direct import* ("Import model…", "Import folder…", or drop files onto the library): the plugin copies the files into `models/<slug>/` in its work folder, analyzes the model (`analysis.json`), renders a thumbnail (`preview.png`), writes a `live3d.json` from the clip and expression names, and puts it on the Desk.

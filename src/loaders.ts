@@ -91,6 +91,9 @@ export interface LoadedModel {
   warnings: string[]
   /** 非 three 的渲染器(未来的 Live2D 等)每帧推进自己;three 模型没有。 */
   tick?(dt: number): void
+  /** 骨骼摆完(片段 + 程序化)之后、渲染之前调一次:骨架自带的约束在这里跟上。现在只有 MMD 的付与(append):
+   *  MMD 的腿网格蒙在 `足D / ひざD / 足首D` 上,它们靠付与复制 `足 / ひざ / 足首` 的旋转 —— 不解算,转腿骨网格纹丝不动。 */
+  afterPose?(): void
   dispose(): void
 }
 
@@ -483,6 +486,7 @@ async function loadThree(opts: LoadModelOptions): Promise<LoadedModel> {
   let root: THREE.Object3D
   let vrm: VRM | undefined
   let own: THREE.AnimationClip[] = []
+  let afterPose: (() => void) | undefined
 
   if (format === 'vrm' || format === 'glb' || format === 'gltf') {
     const gltf = await parseGltf(await fetchBytes(path, opts), tm.manager, { vrm: true, textureHook: opts.textureHook })
@@ -512,10 +516,15 @@ async function loadThree(opts: LoadModelOptions): Promise<LoadedModel> {
   } else if (format === 'pmx' || format === 'pmd') {
     // MMDLoader 只有 load(url)。给它**裸文件名**:模型与贴图(`tex\\体.png`)都经 URL 修改器按模型文件夹解析成
     // assetUrl,与 FBX / MTL 贴图同一条路;不包 blob: —— 老宿主 CSP 的 connect-src 不放行 blob:,fetch 会被拦。
-    // ponytail: 于是 opts.readBytes 对 PMX 不生效(生产没传它);不接物理(头发 / 裙摆静止)、不跑 IK / 付与,
-    // 要 VMD 动作时再接 mmd.update。
+    // ponytail: 于是 opts.readBytes 对 PMX 不生效(生产没传它);不接物理(头发 / 裙摆静止)、不跑 IK,
+    // 要 VMD 动作时再接 mmd.update。付与(append)要跑:见 LoadedModel.afterPose。
     try {
-      root = (await new MMDLoader(tm.manager).setResourcePath('./').loadAsync(baseName(path))).mesh
+      const mmd = await new MMDLoader(tm.manager).setResourcePath('./').loadAsync(baseName(path))
+      root = mmd.mesh
+      // 付与每帧「先把上一帧的输出还原成输入,再乘上源骨旋转」(GrantSolver.beginFrame),不跨帧累加 ——
+      // 所以可以直接接在程序化姿势之后。没有付与骨的模型 entries 为空,update 近乎零开销。
+      const grant = mmd.grantSolver
+      afterPose = () => grant.update()
     } catch (e) {
       if ((e as { response?: Response })?.response?.status === 404) throw notFound(path)
       throw new LoadError('parse-failed', toParseMsg(e), e)
@@ -619,6 +628,7 @@ async function loadThree(opts: LoadModelOptions): Promise<LoadedModel> {
     clipSources,
     ...idx,
     warnings,
+    afterPose,
     dispose() {
       disposeTree(root)
     },

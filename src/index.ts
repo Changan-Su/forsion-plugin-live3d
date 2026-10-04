@@ -7,8 +7,10 @@
 // 生态铁律:**每个新接缝都可选链**(ctx.desk?、ctx.tangu?.startChat?、ctx.app.writeBytes? …)——
 // 老宿主缺哪条就少哪块功能,setup 本身绝不抛。check.mjs 用裸 ctx 装载 + 逐条拆守卫的负对照钉住这一条。
 //
-// 分工:ui/state(落盘设置 / 模型库 / 定时器)· ui/importer(直接导入 / Agent 协助导入)·
-//       ui/companion(Desk 伴随面,单舞台多挂载点)· ui/studio(模型库视图)· ui/settings(设置面)。
+// 分工:ui/state(落盘设置 / 模型库 / 场景库 / 定时器)· ui/importer(直接导入 / Agent 协助导入)·
+//       ui/companion(Desk 伴随面,单舞台多挂载点)· ui/studio(模型库视图)· ui/settings(设置面)·
+//       ui/roomHost + ui/room(3D 小屋:Space 主区视图,场景 + 行为)· ui/screensaver(空闲全屏屏保,与小屋共用一块画布)。
+// 独立 Space 是数据:包根 spaces/live3d/space.json 引用本插件的视图 `plugin:live3d:room`,宿主扫捆绑包时装上 ribbon。
 import css from './live3d.css'
 import { setLocale, t } from './i18n'
 import type { HostCtx } from './ui/host'
@@ -17,6 +19,9 @@ import { createImporter } from './ui/importer'
 import { createCompanion } from './ui/companion'
 import { mountStudio } from './ui/studio'
 import { mountSettings } from './ui/settings'
+import { createRoomHost } from './ui/roomHost'
+import { mountRoom } from './ui/room'
+import { createScreensaver } from './ui/screensaver'
 
 declare const ctx: HostCtx
 
@@ -39,10 +44,17 @@ const importer = createImporter(shell, { writeBytes: hostWriteBytes, startChat: 
 const mounted = new Set<() => void>()
 
 const STUDIO_VIEW = 'studio'
+const ROOM_VIEW = 'room'
 const openStudio = (): void => {
   if (ctx.openView) ctx.openView(STUDIO_VIEW)
   else shell.say('info', () => t('studio.noView'))
 }
+const openRoom = (): void => {
+  if (ctx.openView) ctx.openView(ROOM_VIEW)
+  else shell.say('info', () => t('studio.noView'))
+}
+const roomHost = createRoomHost(shell)
+const saver = createScreensaver(shell, roomHost)
 
 const track = (off: () => void): (() => void) => {
   let done = false
@@ -63,10 +75,17 @@ ctx.registerView?.({
   mount: (el) => track(mountStudio(el, shell, importer)),
 })
 
+ctx.registerView?.({
+  id: ROOM_VIEW,
+  title: t('room.title'),
+  singleton: true,
+  mount: (el) => track(mountRoom(el, shell, roomHost, saver, openStudio)),
+})
+
 ctx.registerSettingsView?.({
   id: 'live3d-settings',
   title: t('settings.title'),
-  mount: (el) => track(mountSettings(el, shell, importer, openStudio)),
+  mount: (el) => track(mountSettings(el, shell, importer, openStudio, { openRoom, saver })),
 })
 
 const companion = deskApi ? createCompanion(shell, deskApi, openStudio) : null
@@ -77,6 +96,19 @@ ctx.registerCommand({
   title: t('cmd.openStudio'),
   keywords: 'live3d 3d avatar vrm model library companion desk 模型库 形象 伴随 moxingku',
   run: openStudio,
+})
+ctx.registerCommand({
+  id: 'live3d-open-room',
+  title: t('cmd.openRoom'),
+  keywords: 'live3d 3d room scene space companion 小屋 场景 房间 xiaowu changjing',
+  run: openRoom,
+})
+ctx.registerCommand({
+  id: 'live3d-screensaver',
+  title: t('cmd.saver'),
+  keywords: 'live3d screensaver fullscreen idle 屏保 全屏 pingbao',
+  // 在用户手势里同步调用:全屏请求要用户激活
+  run: () => saver.start(true),
 })
 ctx.registerCommand({
   id: 'live3d-import',
@@ -122,7 +154,9 @@ void shell.ready.then(() => shell.refresh())
 /** 宿主的 teardown 出口 —— build.mjs 的 footer 把它 `return` 出去。 */
 export function dispose(): void {
   companion?.dispose()
+  saver.dispose()
   for (const off of [...mounted]) off()
+  roomHost.dispose()
   importer.dispose()
   try {
     offLocale?.()

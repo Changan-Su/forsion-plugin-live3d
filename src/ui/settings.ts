@@ -1,12 +1,16 @@
 // 插件详情页里的自绘设置面(ctx.registerSettingsView):显示模式、当前 Desk 形象、导入入口、工作文件夹的
 // **绝对路径**(技能与用户都要靠它找到目录)、问题清单。宿主可能反复挂载卸载这一面 —— 状态全在 shell 里。
 import { joinRel } from '../contract'
-import { t } from '../i18n'
+import { currentLocale, t } from '../i18n'
+import { pickLabel } from '../room/scene'
 import { button, esc, handleCommon, libraryHint, modeRadios, noticeBar, problemList } from './dom'
 import type { Importer } from './importer'
-import type { Shell } from './state'
+import type { Screensaver } from './screensaver'
+import { SAVER_MINUTES, type Shell } from './state'
 
-export function mountSettings(el: HTMLElement, shell: Shell, importer: Importer, openStudio: () => void): () => void {
+export function mountSettings(
+  el: HTMLElement, shell: Shell, importer: Importer, openStudio: () => void, room?: { openRoom: () => void; saver: Screensaver },
+): () => void {
   const ctx = shell.ctx
   el.classList.add('l3-view', 'l3-settings')
   let disposed = false
@@ -60,7 +64,34 @@ export function mountSettings(el: HTMLElement, shell: Shell, importer: Importer,
         ${ctx.app.reveal ? button('open-folder', t('btn.openFolder')) : ''}
       </div>
       ${libraryHint(shell)}
-      ${problemList(st.problems)}`
+      ${problemList(st.problems)}
+      ${room ? roomSection() : ''}`
+  }
+
+  function roomSection(): string {
+    const d = shell.data()
+    const scenes = shell.scenes.state().entries
+    const opts = [{ v: '', label: scenes.length ? t('room.sceneAuto') : t('room.builtin') }, ...scenes.map((e) => ({ v: e.slug, label: pickLabel(e.scene.name, currentLocale()) ?? e.slug }))]
+    return `
+      <div class="l3-section">
+        <div class="l3-section-title">${esc(t('settings.room'))}</div>
+        <div class="l3-hint">${esc(t('settings.roomHint'))}</div>
+        <div class="l3-row">
+          <select class="l3-select" data-act="scene" aria-label="${esc(t('room.scene'))}">${opts
+            .map((o) => `<option value="${esc(o.v)}"${o.v === (d.scene ?? '') ? ' selected' : ''}>${esc(o.label)}</option>`)
+            .join('')}</select>
+          ${ctx.openView ? button('open-room', t('settings.openRoom')) : ''}
+        </div>
+        <label class="l3-check"><input type="checkbox" data-act="saver-on"${d.saver.enabled ? ' checked' : ''}><span>${esc(t('settings.saverOn'))}</span></label>
+        <div class="l3-row">
+          <span class="l3-hint">${esc(t('settings.saverAfter'))}</span>
+          <select class="l3-select" data-act="saver-min" aria-label="${esc(t('settings.saverAfter'))}">${SAVER_MINUTES
+            .map((n) => `<option value="${n}"${n === d.saver.minutes ? ' selected' : ''}>${esc(t('settings.minutes', { n }))}</option>`)
+            .join('')}</select>
+          ${button('saver-start', t('settings.saverStart'))}
+        </div>
+        <div class="l3-hint">${esc(t('settings.saverHint'))}</div>
+      </div>`
   }
 
   const onClick = (ev: Event): void => {
@@ -85,12 +116,22 @@ export function mountSettings(el: HTMLElement, shell: Shell, importer: Importer,
       case 'refresh':
         void shell.refresh(true)
         break
+      case 'open-room':
+        room?.openRoom()
+        break
+      case 'saver-start':
+        room?.saver.start(true) // 点击手势里同步调用:能进系统全屏
+        break
     }
   }
   const onChange = (ev: Event): void => {
     const input = ev.target as HTMLInputElement | HTMLSelectElement
-    if (input.dataset.act === 'mode' && (input.value === 'idle' || input.value === 'always')) shell.setMode(input.value)
-    else if (input.dataset.act === 'active') shell.setActive(input.value || null)
+    const act = input.dataset.act
+    if (act === 'mode' && (input.value === 'idle' || input.value === 'always')) shell.setMode(input.value)
+    else if (act === 'active') shell.setActive(input.value || null)
+    else if (act === 'scene') shell.setRoom({ scene: input.value || null })
+    else if (act === 'saver-on') shell.setRoom({ saver: { ...shell.data().saver, enabled: (input as HTMLInputElement).checked } })
+    else if (act === 'saver-min') shell.setRoom({ saver: { ...shell.data().saver, minutes: Number(input.value) } })
   }
   el.addEventListener('click', onClick)
   el.addEventListener('change', onChange)
