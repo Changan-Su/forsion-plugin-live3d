@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — 2026-09-26
+## 0.2.0 — 2026-10-04
 
 - **3D 小屋(独立 Space)**:左侧功能条新增「3D 小屋」,主区是一间三面剖开的等距小房间,右侧是聊天。形象住在房间里自己过日子(走动、坐下看书、躺上床睡觉、弹琴、看星星……),Agent 干活时起身去书桌:思考托腮、调工具埋头干活、说话时转过来对着你、等你回应时走到跟前招手、完成欢呼、出错叹气。
   **3D room (its own Space)**: a cut-away isometric room where the avatar goes about its day and heads to the desk when the agent works — thinking, busy with a tool, turning round to talk to you, walking up to wave when it needs you, cheering or sighing.
@@ -12,6 +12,11 @@
   MMD append (grant) bones are now solved, so legs and twist bones move with the pose.
 - 点一下房间里的角色:醒着打招呼,睡着的会被吵醒(皱眉、打哈欠)。
   Click the character in the room: awake it waves, asleep it wakes up grumpy.
+- 「3D 小屋」在功能条上用插件自己的图标(`space.json` 的 `iconFile`);还不认这个字段的宿主照旧显示图标库里的星星。
+  The 3D room Space shows the plugin's own icon on the ribbon (`iconFile` in `space.json`); hosts that do not know the field yet keep the library icon.
+
+宿主要求不变:Forsion 2.11.2 及以上的桌面端(这一版的宿主已经会装载插件自带的 Space)。
+The host requirement is unchanged: desktop Forsion 2.11.2 or newer, which already loads Spaces bundled with a plugin.
 
 ## 0.1.0 — 2026-09-20
 
