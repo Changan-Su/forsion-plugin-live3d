@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-10-04
+
+- **语音通话对口型**:和 Agent 打语音电话时,形象的嘴跟着它真实的声音开合(响的音节张大、音节之间合上),不再是一动不动;你说完、它还没开口时抬眼想一想。Desk 形象、3D 小屋和屏保都生效。按最近几秒的响度自动归一,换音色、调音量不用自己校。
+  **Lip sync in voice calls**: during a voice call the avatar's mouth follows the agent's actual voice (wide on loud syllables, closed between them) instead of staying still, and it looks up to think after you finish speaking. Works on the Desk, in the 3D room and in the screensaver. The mouth range adapts to recent loudness, so different voices and volumes need no tuning.
+- 通话里把事情交给 Agent 去办时,聊天区在出字但没有声音 —— 嘴不动(以前按出字速度张合)。
+  While the agent works on something you asked for during a call, text streams in the chat but nothing is spoken, so the mouth stays shut.
+- 需要宿主提供通话电平(Forsion Desktop 2.12.2 之后的版本);旧宿主上照旧按出字速度做口型,`minAppVersion` 不变。只有「开合」一个口型通道(VRM `aa` / 模型的口型 morph),没有 あいうえお 逐音素口型。
+  Needs a host that reports the call's audio level (Forsion Desktop after 2.12.2); on older hosts the mouth keeps following the streamed text and `minAppVersion` is unchanged. One open/close channel only (VRM `aa` or the model's mouth morph), no per-vowel shapes.
+
 ## 0.2.0 — 2026-10-04
 
 - **3D 小屋(独立 Space)**:左侧功能条新增「3D 小屋」,主区是一间三面剖开的等距小房间,右侧是聊天。形象住在房间里自己过日子(走动、坐下看书、躺上床睡觉、弹琴、看星星……),Agent 干活时起身去书桌:思考托腮、调工具埋头干活、说话时转过来对着你、等你回应时走到跟前招手、完成欢呼、出错叹气。

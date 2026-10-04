@@ -23,6 +23,9 @@ export interface AgentStatusLike {
   messageId?: string
   /** 当前流式气泡正文的累计字符数(拉取式,stage 逐帧求增量)。 */
   textChars: number
+  /** 语音通话里模型输出的真实电平 0..1(宿主 2026-10-04+;只在会话正在通话时出现,没出声 = 0)。
+   *  有它就按它做口型,不再看 textChars(见 reactions.createMouthDriver)。 */
+  speechLevel?: number
 }
 
 /** 某个阶段的反应配置。全部可省略,省略的部分由 reactions.planFor 按阶段缺省补。 */

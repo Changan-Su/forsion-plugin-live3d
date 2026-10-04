@@ -296,6 +296,35 @@ export function createRigHarness(deps: RigDeps): Record<string, (...a: Any[]) =>
         return { peak: +peak.toFixed(3), afterDone: +afterDone.toFixed(3), afterIdle: +read().toFixed(3) }
       })
     },
+    /** 语音通话:状态带 speechLevel → jawOpen 跟真实电平(响 → 张、静 → 合);通话里出字不出声(textChars 猛涨、电平 0)嘴不动。 */
+    async voice() {
+      const read = (): number => parts.mesh!.morphTargetInfluences![0]
+      return withStage(panel(), 'panel', { clips: () => [] }, {}, async (st) => {
+        let level = 0
+        let chars = 0
+        const t0 = performance.now()
+        st.setStatusSource(() => ({ phase: 'speaking', sessionId: 's', messageId: 'm1', textChars: (chars = Math.floor((performance.now() - t0) / 10)), speechLevel: level }))
+        st.setStatus({ phase: 'speaking', sessionId: 's', messageId: 'm1', textChars: 0, speechLevel: 0 })
+        const settle = async (l: number): Promise<{ min: number; max: number }> => {
+          level = l
+          await sleep(400)
+          let min = 1
+          let max = 0
+          for (let i = 0; i < 8; i++) {
+            await sleep(50)
+            const v = read()
+            min = Math.min(min, v)
+            max = Math.max(max, v)
+          }
+          return { min: +min.toFixed(3), max: +max.toFixed(3) }
+        }
+        const silent = await settle(0)
+        const loud = await settle(0.6)
+        const soft = await settle(0.2)
+        const quiet = await settle(0)
+        return { silent, loud, soft, quiet }
+      })
+    },
     /** 卡片封顶 30fps + 75Hz 屏(帧距 40ms):片段要按真实时间走(旧的 1/30 钳制 → 0.83 倍慢放)。 */
     async slowmo(hz = 75) {
       const clip = new THREE.AnimationClip('Idle', 100, [new THREE.NumberKeyframeTrack('Mover.position[x]', [0, 100], [0, 100])])

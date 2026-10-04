@@ -1,7 +1,7 @@
 {
   "name": "forsion-plugin-live3d",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Forsion Live3D:Agent Desk 里的 3D 陪伴形象(构建源;产物 main.js 已提交)",
   "type": "module",
   "scripts": {

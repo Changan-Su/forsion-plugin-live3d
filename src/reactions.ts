@@ -1,9 +1,9 @@
-// 阶段 → 反应计划(纯函数)+ 口型包络。stage 与 orb 都只吃这里的输出,不自己判断「思考时该干嘛」。
+// 阶段 → 反应计划(纯函数)+ 口型(出字包络 / 语音通话的真实电平)。stage 与 orb 都只吃这里的输出,不自己判断「思考时该干嘛」。
 //
 // 计划由三层拼成:① profile 里这个阶段的 StateSpec ② 缺省表(PHASE_EXPRESSIONS / 下面的 PROC)
 // ③ 模型能力(有没有这个片段 / 表情 / 口型 morph)。没有能力的项直接丢掉,不留「想播但播不了」的名字。
 
-import type { Phase, Profile, StateSpec } from './contract'
+import type { AgentStatusLike, Phase, Profile, StateSpec } from './contract'
 import { PHASE_EXPRESSIONS, pickExpression } from './heuristics'
 
 /** 模型能提供什么(stage 按加载结果填)。 */
@@ -188,4 +188,69 @@ export function mouthFlap(envelope: number, t: number): number {
   if (envelope <= 0.001) return 0
   const syll = Math.abs(Math.sin(t * Math.PI * 5.2)) * 0.75 + Math.abs(Math.sin(t * Math.PI * 2.3 + 1.1)) * 0.25
   return clamp01(envelope * (0.25 + 0.75 * syll))
+}
+
+// ── 真实语音口型(语音通话)────────────────────────────────────────────────────
+/** 低于这个电平不张嘴(编码底噪 / 气声)。 */
+export const SPEECH_FLOOR = 0.04
+/** 自动增益的下限:最近的峰值再小,也按「峰值 = FLOOR + 这么多」算 —— 免得把一段几乎没声的气声放大成满嘴。
+ *  校准旋钮:嫌轻声的音色嘴张不开就调小,嫌底噪也在动嘴就调大。 */
+export const SPEECH_MIN_SPAN = 0.2
+/** 峰值的回落时间常数(秒):换了更轻的音色 / 调小了音量,几秒后嘴重新张得开。 */
+export const SPEECH_PEAK_TAU = 4
+
+/** 峰值跟踪:立刻跟上更响的,按 SPEECH_PEAK_TAU 慢慢回落。 */
+export const speechPeak = (peak: number, level: number, dt: number): number =>
+  Math.max(level, peak * Math.exp(-Math.max(0, dt) / SPEECH_PEAK_TAU))
+
+/**
+ * 宿主 speechLevel(模型输出的真实电平,0..1,~20Hz 更新)→ 张嘴量。这是真声音:音节的起伏已经在信号里,
+ * 所以只做门限 + 按近期峰值归一 + 一阶平滑(上升 τ≈40ms 跟得上爆破音,回落 τ≈90ms 让音节之间合一下而不抖),
+ * 不叠 mouthFlap 的正弦。归一是因为绝对响度靠不住:音色之间差得多,写死增益不是张不开就是总张满。
+ * ponytail: 只有「开合」一个通道(VRM 'aa' / 口型 morph);要 あいうえお 五个口型得宿主再给频谱。
+ */
+export function speechMouth(prev: number, level: number, peak: number, dt: number): number {
+  const target = clamp01((level - SPEECH_FLOOR) / Math.max(peak - SPEECH_FLOOR, SPEECH_MIN_SPAN))
+  const tau = target > prev ? 0.04 : 0.09
+  return clamp01(prev + (target - prev) * (1 - Math.exp(-Math.max(0, dt) / tau)))
+}
+
+/**
+ * 一帧的张嘴量(两个舞台共用):状态里有 speechLevel(会话在语音通话)→ 跟真实电平;否则跟出字速度(包络 + 开合)。
+ * 通话里代办 run 在聊天区出字时 speechLevel = 0 —— 没有声音,嘴不动。
+ * @param s 本帧拉到的状态;undefined = 没有拉取源(预览 / 老宿主)→ 匀速「出字」;null = 拉取失败 → 只衰减。
+ */
+export interface MouthDriver {
+  step(speaking: boolean, s: AgentStatusLike | null | undefined, t: number, dt: number): number
+  reset(): void
+}
+
+export function createMouthDriver(): MouthDriver {
+  const env = createMouthEnvelope()
+  let voiced = 0
+  let peak = 0 // 跨句保留(同一通电话的响度不会一句一变),只随时间回落
+  return {
+    step(speaking, s, t, dt) {
+      if (!speaking) {
+        env.decay(t)
+        voiced = 0
+        return 0
+      }
+      if (typeof s?.speechLevel === 'number') {
+        env.decay(t) // 通话结束切回出字口型时从 0 起
+        peak = speechPeak(peak, s.speechLevel, dt)
+        voiced = speechMouth(voiced, s.speechLevel, peak, dt)
+        return voiced
+      }
+      voiced = 0
+      if (s === undefined) env.sample(Math.floor(t * 30), t, 'synthetic')
+      else if (s) env.sample(s.textChars, t, s.messageId)
+      else env.decay(t)
+      return mouthFlap(env.value, t)
+    },
+    reset() {
+      env.reset()
+      voiced = 0
+    },
+  }
 }

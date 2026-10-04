@@ -29,7 +29,7 @@ import { DEFAULT_POSE, isPhase } from './contract'
 import { analyze, measure } from './analysis'
 import { findMorphs, findRigBones, type RigRole } from './heuristics'
 import { loadModel, toMsg, type LoadErrorCode, type LoadedModel, type LoadModelOptions } from './loaders'
-import { createMouthEnvelope, mouthFlap, planFor, PROC, type Caps, type ProcPlan, type ReactionPlan } from './reactions'
+import { createMouthDriver, planFor, PROC, type Caps, type ProcPlan, type ReactionPlan } from './reactions'
 import { createOrb, readAccent, type Orb } from './orb'
 
 // ── 公共类型 ──────────────────────────────────────────────────────────────────
@@ -752,7 +752,7 @@ export function createStage(opts: StageOptions): Stage {
   let preview: Phase | null = null
   let phase: Phase = 'idle'
   let plan: ReactionPlan = planFor('idle', undefined, avatar.caps, null)
-  const env = createMouthEnvelope()
+  const lips = createMouthDriver()
   const proc: ProcPlan = { ...PROC.idle }
   const look = { yaw: 0, pitch: 0 }
   const reducedMq = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
@@ -764,7 +764,7 @@ export function createStage(opts: StageOptions): Stage {
     phase = next
     plan = planFor(next, isOrb ? undefined : profile?.states, avatar.caps, prev)
     avatar.applyPlan(plan)
-    if (next !== 'speaking') env.reset()
+    if (next !== 'speaking') lips.reset()
   }
 
   // 交互 / 指针
@@ -868,23 +868,16 @@ export function createStage(opts: StageOptions): Stage {
     const t = timer.getElapsed()
     const reduced = !!reducedMq?.matches
 
-    // 状态 → 口型
-    let mouth = 0
-    if (phase === 'speaking') {
-      if (source && preview === null) {
-        let s: AgentStatusLike | null = null
-        try {
-          s = source()
-        } catch {
-          s = null
-        }
-        if (s) env.sample(s.textChars, t, s.messageId)
-        else env.decay(t)
-      } else {
-        env.sample(Math.floor(t * 30), t, 'synthetic') // 没有拉取源(预览 / 老宿主):匀速「出字」
+    // 状态 → 口型(语音通话跟真实电平,否则跟出字速度;没有拉取源 = 预览 / 老宿主 → 匀速「出字」)
+    let s: AgentStatusLike | null | undefined
+    if (phase === 'speaking' && source && preview === null) {
+      try {
+        s = source()
+      } catch {
+        s = null
       }
-      mouth = mouthFlap(env.value, t)
-    } else env.decay(t)
+    }
+    const mouth = lips.step(phase === 'speaking', s, t, dt)
 
     // 程序化参数平滑
     const pt = PROC[phase]
