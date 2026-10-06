@@ -6,7 +6,7 @@
 | --- | --- |
 | 空闲 | 轻轻呼吸摇摆,眼睛跟着鼠标 |
 | 思考 | 抬眼琢磨、歪头 |
-| 说话 | 口型随流式输出一张一合,轻轻点头 |
+| 说话 | 口型随流式输出一张一合,轻轻点头;**语音通话**时口型跟着 Agent 真实的声音开合(宿主给电平,见 CHANGELOG 0.3.0) |
 | 调用工具 | 低头干活 |
 | 等你回应(审批 / 提问) | 看着你蹦一下 |
 | 出错 | 垂头丧气 |
@@ -106,7 +106,7 @@ sh install.sh        # 装到 ~/.forsion-dev(prod:sh install.sh prod)
 
 ## English
 
-**Live3D** puts a 3D avatar on the **Agent Desk** to the right of the Tangu chat and makes it react to the agent: idle breathing and eyes that follow the pointer, looking up while thinking, lip sync that follows the streamed answer, looking down while a tool runs, a hop when it needs you, a droop on errors and a small celebration when a run finishes. Clips and expressions that come with the model (Idle / Talk / Typing / Wave / Cheer…, VRM happy / sad / aa…) are matched to these states automatically. Until you import a model, a friendly orb reacts instead. Everything renders offline.
+**Live3D** puts a 3D avatar on the **Agent Desk** to the right of the Tangu chat and makes it react to the agent: idle breathing and eyes that follow the pointer, looking up while thinking, lip sync that follows the streamed answer (and the agent's actual voice during a voice call), looking down while a tool runs, a hop when it needs you, a droop on errors and a small celebration when a run finishes. Clips and expressions that come with the model (Idle / Talk / Typing / Wave / Cheer…, VRM happy / sad / aa…) are matched to these states automatically. Until you import a model, a friendly orb reacts instead. Everything renders offline.
 
 **Display modes.** *When idle* (default): shown only while the Desk has nothing on it (a draft chat, an empty session, or after "Clear Desk"); it steps aside when the agent presents a file. *Always*: completely replaces the Agent Desk file presentation — the card and the expanded panel show only the avatar, and files the agent presents, edit auto-show and chat citations open in a new tab instead.
 

@@ -304,6 +304,13 @@ const rafRate = async (ms = 500) => { await sleep(250); const a = rafCalls; awai
       st.setStatusSource(phase === 'speaking' ? () => ({ phase, sessionId: 's1', messageId: 'm1', textChars: (chars += 3) }) : null)
     }
   },
+  /** 语音通话:说话相位 + 恒定电平(出字照常在涨 —— 有电平时不许看它)。截图自查张嘴 / 合嘴用。 */
+  setVoice(level: number) {
+    for (const st of stages) {
+      st.setStatus({ phase: 'speaking', sessionId: 's1', textChars: chars, messageId: 'm1', speechLevel: level })
+      st.setStatusSource(() => ({ phase: 'speaking' as const, sessionId: 's1', messageId: 'm1', textChars: (chars += 3), speechLevel: level }))
+    }
+  },
   async snapshot() {
     const b = await stages[1].snapshot()
     return b ? b.size : 0
@@ -536,6 +543,10 @@ async function rigChecks(pg, errors, setTag) {
     const m = await rig('mouth', kind)
     check(`[rig] 口型(${kind === 'morph' ? '非 VRM 的 jawOpen' : "VRM 自定义 mouth 'oh'"}):说话时张嘴,done / idle 后收回 0`, m.peak > 0.2 && m.afterDone < 0.02 && m.afterIdle < 0.02, JSON.stringify(m))
   }
+  setTag('rig:voice')
+  const vo = await rig('voice')
+  check('[rig] 语音通话口型:电平 0.6 张大且稳(真声音不叠开合)、0.2 张小、静音合上 —— 出字再快也不张',
+    vo.loud.min > 0.85 && vo.soft.max < 0.5 && vo.soft.min > 0.15 && vo.silent.max < 0.02 && vo.quiet.max < 0.02, JSON.stringify(vo))
   setTag('rig:slowmo')
   const rate = await rig('slowmo', 75)
   check('[rig] 卡片 30fps 封顶 × 75Hz 屏(帧距 40ms):片段按真实时间走(旧 1/30 钳制 ≈ 0.83 倍慢放)', rate >= 0.93 && rate <= 1.07, `${rate} 片段秒 / 墙钟秒`)
@@ -691,6 +702,15 @@ try {
         const cc = coverage(cardPng, [0xfb, 0xfa, 0xf7])
         const pc = coverage(panelPng, [0x1e, 0x1f, 0x22])
         check(`[${variant}] ${s.slug}/${phase}: 卡片与侧板都画出了东西`, cc > 0.02 && pc > 0.02, `card ${(cc * 100).toFixed(1)}%, panel ${(pc * 100).toFixed(1)}%`)
+      }
+      if (variant === 'strict' && (s.slug === 'vrm1' || s.slug === 'vrm0' || s.mmd)) {
+        // 语音通话口型的两张自查截图(数值口径在 rig:voice;这里是「真模型上看起来对不对」)
+        tag = `voice:${s.slug}`
+        for (const [name, level] of [['shut', 0], ['open', 0.7]]) {
+          await pg.evaluate((l) => window.__l3.setVoice(l), level)
+          await pg.waitForTimeout(700)
+          writeFileSync(join(SHOTS_DIR, `${s.slug}-panel-voice-${name}.png`), await pg.locator('#panel').screenshot())
+        }
       }
       if (variant === 'strict' && s.slug === 'vrm1') {
         tag = `interact:${s.slug}`

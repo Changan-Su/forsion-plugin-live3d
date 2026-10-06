@@ -17,7 +17,7 @@ import { isPhase } from '../contract'
 import { createModelAvatar, frameDelta, type Avatar, type SetProfileResult } from '../stage'
 import { createOrb, readAccent } from '../orb'
 import { loadModel, toMsg, type LoadedModel } from '../loaders'
-import { createMouthEnvelope, mouthFlap, planFor, PROC, type ProcPlan } from '../reactions'
+import { createMouthDriver, planFor, PROC, type ProcPlan } from '../reactions'
 import { pickExpression } from '../heuristics'
 import { isNight, type EmoteName, type ResolvedScene, type TimeMode, PROP_INFO } from './scene'
 import { createBrain, type Brain, propToWorld } from './brain'
@@ -392,7 +392,7 @@ export function createRoomStage(opts: RoomStageOptions): RoomStage {
   // 状态
   let status: AgentStatusLike = { phase: 'idle', sessionId: null, textChars: 0 }
   let source: (() => AgentStatusLike) | null = null
-  const env = createMouthEnvelope()
+  const lips = createMouthDriver()
   const look = { yaw: 0, pitch: 0 }
   let free = { yaw: 0, pitch: 0, next: 0 }
   const reducedMq = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
@@ -787,19 +787,16 @@ export function createRoomStage(opts: RoomStageOptions): RoomStage {
     if (Math.abs(az - a0) + Math.abs(el - e0) > 1e-5) fit()
     else if (Math.abs(zoom - z0) > 1e-5) placeCamera()
 
-    // 口型
-    let mouth = 0
+    // 口型(语音通话跟真实电平,否则跟出字速度;拉不到状态 → 匀速「出字」)
+    let s: AgentStatusLike | undefined
     if (status.phase === 'speaking') {
-      let s: AgentStatusLike | null = null
       try {
-        s = source?.() ?? null
+        s = source?.() ?? undefined
       } catch {
-        s = null
+        s = undefined
       }
-      if (s) env.sample(s.textChars, t, s.messageId)
-      else env.sample(Math.floor(t * 30), t, 'synthetic')
-      mouth = mouthFlap(env.value, t)
-    } else env.decay(t)
+    }
+    const mouth = lips.step(status.phase === 'speaking', s, t, dt)
 
     // 行为 → 姿势 → 骨骼
     if (brain && animator) {
@@ -1043,7 +1040,7 @@ export function createRoomStage(opts: RoomStageOptions): RoomStage {
       status = next
       if (!changed) return
       avatar.applyPlan(planFor(status.phase, isOrb ? undefined : profile?.states, avatar.caps, null))
-      if (status.phase !== 'speaking') env.reset()
+      if (status.phase !== 'speaking') lips.reset()
       brain?.setPhase(status.phase)
     },
     setStatusSource(fn) {

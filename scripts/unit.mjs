@@ -447,6 +447,83 @@ t('reactions: mouthFlap 在 [0,1] 内且包络为 0 时闭嘴', () => {
   }
   A.ok(M.mouthFlap(1, 0.1) > M.mouthFlap(0.2, 0.1))
 })
+t('reactions: 语音通话口型 speechMouth(门限 / ~40ms 起 / ~90ms 落 / 按近期峰值归一 / dt=0 不动)', () => {
+  A.equal(M.speechMouth(0, 0.03, 0.5, 0.05), 0) // 底噪不张嘴
+  let v = 0
+  for (let i = 0; i < 6; i++) v = M.speechMouth(v, 0.5, 0.5, 1 / 60) // 100ms,正在峰值上
+  A.ok(v > 0.85, `attack too slow: ${v}`)
+  let d = v
+  for (let i = 0; i < 18; i++) d = M.speechMouth(d, 0, 0.5, 1 / 60) // 300ms
+  A.ok(d < 0.06, `release too slow: ${d}`)
+  A.ok(M.speechMouth(0.9, 0, 0.5, 1 / 60) > 0.7, '回落不许一帧掉到底(音节之间会抖)')
+  A.equal(M.speechMouth(0.2, 0.5, 0.5, 0), 0.2)
+  // 归一:同一个电平,近期峰值越高张得越小;轻声的音色(峰值 0.25)照样张得开
+  A.ok(M.speechMouth(0, 0.25, 0.25, 1) > 0.95)
+  A.ok(M.speechMouth(0, 0.25, 0.9, 1) < 0.3)
+  // 下限:几乎没声(峰值 0.06)时不把气声放大成满嘴
+  A.ok(M.speechMouth(0, 0.06, 0.06, 1) < 0.15)
+  // 峰值:立刻跟上更响的,按秒级慢慢回落
+  A.equal(M.speechPeak(0.2, 0.7, 1 / 60), 0.7)
+  const p1 = M.speechPeak(0.7, 0, 1)
+  A.ok(p1 > 0.5 && p1 < 0.6, `peak decay: ${p1}`)
+})
+t('reactions: 口型驱动(有 speechLevel 跟真实电平;通话里出字不出声 → 嘴不动;没有才跟出字速度)', () => {
+  const d = M.createMouthDriver()
+  const dt = 1 / 60
+  const st = (extra) => ({ phase: 'speaking', sessionId: 's', messageId: 'm', textChars: 0, ...extra })
+  // 语音:电平恒定 → 单调逼近目标(真声音,不叠正弦开合),与 textChars 无关
+  let v = 0
+  let mono = true
+  for (let i = 0; i < 15; i++) {
+    const n = d.step(true, st({ speechLevel: 0.6 }), i * dt, dt)
+    if (n < v) mono = false
+    v = n
+  }
+  A.ok(v > 0.9 && mono, `voice: ${v} mono=${mono}`)
+  // 响的那句之后紧跟一个轻音节:按比例张小(峰值还记着),不是又张满
+  let soft = v
+  for (let i = 0; i < 12; i++) soft = d.step(true, st({ speechLevel: 0.2 }), (15 + i) * dt, dt)
+  A.ok(soft > 0.15 && soft < 0.45, `soft after loud: ${soft}`)
+  // 通话中代办 run 在聊天区出字(textChars 猛涨)但模型没出声:嘴合上
+  let chars = 0
+  let q = v
+  for (let i = 15; i < 75; i++) q = d.step(true, st({ textChars: (chars += 5), speechLevel: 0 }), i * dt, dt)
+  A.ok(q < 0.02, `silent call must not flap by text: ${q}`)
+  // 没有 speechLevel(不在通话 / 旧宿主):照旧跟出字速度
+  let peak = 0
+  for (let i = 75; i < 135; i++) peak = Math.max(peak, d.step(true, st({ textChars: (chars += 3) }), i * dt, dt))
+  A.ok(peak > 0.3, `text path: ${peak}`)
+  // 没有拉取源(预览 / 老宿主):匀速「出字」也张嘴;拉取失败(null)只衰减
+  const d2 = M.createMouthDriver()
+  let p2 = 0
+  for (let i = 0; i < 60; i++) p2 = Math.max(p2, d2.step(true, undefined, i * dt, dt))
+  A.ok(p2 > 0.3, `synthetic: ${p2}`)
+  let z = 1
+  for (let i = 60; i < 120; i++) z = d2.step(true, null, i * dt, dt)
+  A.ok(z < 0.02, `null source decays: ${z}`)
+  // 挂断(字段消失)时 run 还在说、但没有新字:通话期间攒下的字不许被当成「刚出的」(嘴会弹开一下)
+  const d3 = M.createMouthDriver()
+  let c3 = 0
+  for (let i = 0; i < 30; i++) d3.step(true, st({ textChars: (c3 += 3) }), i * dt, dt) // 先是出字口型
+  for (let i = 30; i < 90; i++) d3.step(true, st({ textChars: (c3 += 5), speechLevel: 0 }), i * dt, dt) // 通话中:出字不出声
+  let pop = 0
+  for (let i = 90; i < 150; i++) pop = Math.max(pop, d3.step(true, st({ textChars: c3 }), i * dt, dt)) // 挂断,没有新字
+  A.ok(pop < 0.02, `hang-up must not replay call-time text: ${pop}`)
+  let again = 0
+  for (let i = 150; i < 210; i++) again = Math.max(again, d3.step(true, st({ textChars: (c3 += 3) }), i * dt, dt))
+  A.ok(again > 0.3, `text path resumes after hang-up: ${again}`)
+  // 峰值按真实时间回落:上一通很响(0.9),隔一分钟来一通轻声的(0.25)照样张得开
+  const d4 = M.createMouthDriver()
+  for (let i = 0; i < 30; i++) d4.step(true, st({ speechLevel: 0.9 }), i * dt, dt)
+  d4.step(false, undefined, 0.6, dt)
+  d4.reset()
+  let quiet = 0
+  for (let i = 0; i < 30; i++) quiet = d4.step(true, st({ speechLevel: 0.25 }), 60 + i * dt, dt)
+  A.ok(quiet > 0.9, `stale peak must not mute a later quiet call: ${quiet}`)
+  // 非 speaking 恒 0,且回到通话口型时从 0 起
+  A.equal(d.step(false, st({ speechLevel: 0.9 }), 3, dt), 0)
+  A.ok(d.step(true, st({ speechLevel: 0.9 }), 3 + dt, dt) < 0.5)
+})
 
 // ── analysis(纯半边) ─────────────────────────────────────────────────────────
 t('analysis: buildAnalysis(RobotExpressive 形态)', () => {

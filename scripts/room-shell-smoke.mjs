@@ -77,6 +77,8 @@ const HARNESS = `
     for (const cb of H.statusSubs) cb(H.status)
   }
   H.talk = () => { H.status = { ...H.status, textChars: H.status.textChars + 9 } }
+  // 语音通话:宿主在状态里给真实电平(拉取式);null = 挂断(字段消失)
+  H.voice = (level) => { const { speechLevel, ...rest } = H.status; H.status = level == null ? rest : { ...rest, speechLevel: level } }
   H.load = async () => {
     const code = await (await fetch('/main.js')).text()
     H.dispose = new Function('ctx', code)(H.ctx)
@@ -193,6 +195,12 @@ try {
     await pg.waitForTimeout(250)
   }
   await shot('4-speaking')
+  // 语音通话:同一个说话相位,口型改跟电平(响 → 静 → 挂断回到出字口型),整段不许有页面错误
+  for (const level of [0.7, 0.3, 0, null]) {
+    await pg.evaluate((l) => window.__h.voice(l), level)
+    await pg.waitForTimeout(500)
+    if (level === 0.7) await shot('4b-voice')
+  }
   await pg.evaluate(() => window.__h.setPhase('idle'))
   await pg.waitForTimeout(4000)
   // 切白天
