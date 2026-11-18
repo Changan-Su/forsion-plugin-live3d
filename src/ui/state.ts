@@ -62,8 +62,9 @@ export interface Shell {
   assetUrl(rel: string): string
   setMode(mode: CompanionMode): void
   setActive(slug: string | null): void
-  /** 3D 小屋的设置(场景 / 昼夜 / 屏保)。只改传进来的键。 */
-  setRoom(patch: Partial<Pick<Data, 'scene' | 'time' | 'saver'>>): void
+  /** 3D 小屋的设置(场景 / 昼夜 / 屏保)。只改传进来的键;屏保也只传改了的那一项(读还没回来时改的,
+   *  要在读回来的值上合并,别把另一项冲回缺省)。 */
+  setRoom(patch: { scene?: string | null; time?: TimeMode | null; saver?: Partial<Data['saver']> }): void
   activeEntry(): LibEntry | null
   /** Desk 该显示的 profile:没有 / 模型文件丢了 → null(小球)。 */
   activeProfile(): ResolvedProfile | null
@@ -139,7 +140,11 @@ export function createShell(ctx: HostCtx): Shell {
     if (blocked) {
       if (!sessionNoticeShown) {
         sessionNoticeShown = true
-        shell.say('warning', () => t('data.sessionOnly'))
+        try {
+          shell.say('warning', () => t('data.sessionOnly'))
+        } catch (err) {
+          console.error('[live3d] notify failed', err)
+        }
       }
       return
     }
@@ -195,8 +200,13 @@ export function createShell(ctx: HostCtx): Shell {
       if (!isDataUnreadable(e)) return
       blocked = true
       console.warn('[live3d] saved settings could not be read; saving is paused for this session', e)
-      // say():右上角通知 + 模型库顶部提示条(视图里看得见,不只一闪而过)
-      shell.say('warning', () => t('data.unreadable'))
+      // say():右上角通知 + 模型库顶部提示条(视图里看得见,不只一闪而过)。宿主通知抛了也不能拦住下面的 loaded = true,
+      // 否则排着队等读完的改动永远不落地。
+      try {
+        shell.say('warning', () => t('data.unreadable'))
+      } catch (err) {
+        console.error('[live3d] notify failed', err)
+      }
     })
     .then(() => {
       loaded = true

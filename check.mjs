@@ -349,22 +349,30 @@ await t('读不出来:切显示模式(命令)照样生效,但一次都不写盘;
   A.equal(warnings(f.log).filter((n) => /只在本次运行里有效/.test(n.m)).length, 1, '每改一次都弹一次就是刷屏')
   d()
 })
-await t('读不出来:设置面换形象 / 换场景 / 开屏保同样只在内存里,不写盘', async () => {
-  installDom()
-  const f = fullCtx()
-  f.ctx.loadData = async () => { throw unreadable() }
-  const d = load(main, f.ctx)
-  await flush()
-  const el = mkEl()
-  const off = f.log.settings[0].mount(el)
-  await flush()
-  el.fire('change', { target: { dataset: { act: 'active' }, value: 'bot' } })
-  el.fire('change', { target: { dataset: { act: 'scene' }, value: 'loft' } })
-  el.fire('change', { target: { dataset: { act: 'saver-on' }, checked: true } })
-  await flush()
-  A.equal(f.log.saved.length, 0, `写盘了:${JSON.stringify(f.log.saved)}`)
-  off()
-  d()
+await t('读不出来:设置面换形象 / 换场景 / 开屏保同样只在内存里,不写盘(对照:没存过时同样三下各写一次盘)', async () => {
+  const drive = async (loadData) => {
+    installDom()
+    const f = fullCtx()
+    if (loadData) f.ctx.loadData = loadData
+    const d = load(main, f.ctx)
+    await flush()
+    const el = mkEl()
+    const off = f.log.settings[0].mount(el)
+    await flush()
+    el.fire('change', { target: { dataset: { act: 'active' }, value: 'bot' } })
+    el.fire('change', { target: { dataset: { act: 'scene' }, value: 'loft' } })
+    el.fire('change', { target: { dataset: { act: 'saver-on' }, checked: true } })
+    await flush()
+    off()
+    d()
+    return f.log.saved
+  }
+  // 对照组:探针真能看见这三下写盘,下面的「0 次」才不是空话
+  const control = await drive(null)
+  A.equal(control.length, 3, `对照组该写三次:${JSON.stringify(control)}`)
+  A.deepEqual([control[2].active, control[2].scene, control[2].saver.enabled], ['bot', 'loft', true])
+  const saved = await drive(async () => { throw unreadable() })
+  A.equal(saved.length, 0, `写盘了:${JSON.stringify(saved)}`)
 })
 await t('读不出来(英文界面):两条提示都是英文、不含汉字', async () => {
   installDom()
@@ -412,17 +420,51 @@ await t('设置还在读的时候就改了:等读完再写,存下的是「原来
   f.ctx.loadData = () => new Promise((r) => { release = r })
   const d = load(main, f.ctx)
   await flush()
-  f.log.commands.find((c) => c.id === 'live3d-toggle-mode').run() // 缺省 idle → always
+  const el = mkEl()
+  const off = f.log.settings[0].mount(el)
+  await flush()
+  f.log.commands.find((c) => c.id === 'live3d-toggle-mode').run() // 存着 idle → 切到 always(按读回来的值算,不按缺省)
+  el.fire('change', { target: { dataset: { act: 'saver-on' }, checked: true } }) // 只开屏保,别把存着的 5 分钟冲回缺省 10
   await flush()
   A.equal(f.log.saved.length, 0, `读回来之前就写盘了:${JSON.stringify(f.log.saved)}`)
-  release?.({ mode: 'idle', active: 'bot', pending: {}, scene: 'loft', time: 'night', saver: { enabled: true, minutes: 5 } })
+  release?.({ mode: 'idle', active: 'bot', pending: {}, scene: 'loft', time: 'night', saver: { enabled: false, minutes: 5 } })
   await flush()
   const last = f.log.saved.at(-1)
-  A.equal(f.log.saved.length, 1, JSON.stringify(f.log.saved))
+  A.ok(f.log.saved.length >= 1, JSON.stringify(f.log.saved))
   A.deepEqual(
     { mode: last?.mode, active: last?.active, scene: last?.scene, time: last?.time, saver: last?.saver },
     { mode: 'always', active: 'bot', scene: 'loft', time: 'night', saver: { enabled: true, minutes: 5 } },
   )
+  off()
+  d()
+})
+await t('存着 always 时读回来之前点「切换显示模式」:按读回来的值切到 idle,不是报「已切换」却纹丝不动', async () => {
+  installDom()
+  const f = fullCtx()
+  let release
+  f.ctx.loadData = () => new Promise((r) => { release = r })
+  const d = load(main, f.ctx)
+  await flush()
+  f.log.commands.find((c) => c.id === 'live3d-toggle-mode').run()
+  await flush()
+  release?.({ mode: 'always', active: null, pending: {} })
+  await flush()
+  A.equal(f.log.saved.at(-1)?.mode, 'idle', JSON.stringify(f.log.saved))
+  d()
+})
+await t('读不出来且宿主通知抛错:读完照样算读完,排队的改动照样落地(只在内存里)', async () => {
+  installDom()
+  const f = fullCtx()
+  let release
+  f.ctx.loadData = () => new Promise((_r, rej) => { release = () => rej(unreadable()) })
+  f.ctx.notify = () => { throw new Error('toast down') }
+  const d = load(main, f.ctx)
+  await flush()
+  f.log.commands.find((c) => c.id === 'live3d-toggle-mode').run()
+  release?.()
+  await flush()
+  A.deepEqual(f.log.updates.at(-1), { mode: 'always' }, '排队的切换没落地')
+  A.equal(f.log.saved.length, 0)
   d()
 })
 await t('设置面与模型库视图挂上 / 卸下不抛;设置面写出工作文件夹的绝对路径', async () => {
@@ -952,7 +994,7 @@ await t('模型库:坏 profile / 缺模型文件 / 没有 profile 的文件夹�
 console.error = realConsole.error
 console.warn = realConsole.warn
 await t('节点桩里的控制台输出只有预期的「WebGL 建不出上下文」(和 4a 故意造的「设置读不出来」)', () => {
-  const other = consoleNoise.filter((l) => !/WebGL/.test(l) && !/^\[live3d\] saved settings could not be read/.test(l))
+  const other = consoleNoise.filter((l) => !/WebGL/.test(l) && !/^\[live3d\] (saved settings could not be read|notify failed|toggle mode failed)/.test(l))
   A.deepEqual(other, [], other.join('\n'))
 })
 

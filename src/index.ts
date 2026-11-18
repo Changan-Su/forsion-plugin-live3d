@@ -127,11 +127,16 @@ ctx.registerCommand({
   id: 'live3d-toggle-mode',
   title: t('cmd.toggleMode'),
   keywords: 'live3d mode idle always desk 显示模式 空闲 总是 moshi',
-  run: () => {
-    const next = shell.data().mode === 'always' ? 'idle' : 'always'
-    shell.setMode(next)
-    shell.say('info', () => t('mode.switched', { mode: t(next === 'always' ? 'mode.always' : 'mode.idle') }))
-  },
+  // 等设置读回来再算「切到哪一档」:读回来之前按缺省 idle 算,存着 always 的人会被报「已切换」却纹丝不动
+  run: () =>
+    void shell.ready
+      .then(() => {
+        if (!shell.alive()) return
+        const next = shell.data().mode === 'always' ? 'idle' : 'always'
+        shell.setMode(next)
+        shell.say('info', () => t('mode.switched', { mode: t(next === 'always' ? 'mode.always' : 'mode.idle') }))
+      })
+      .catch((e: unknown) => console.error('[live3d] toggle mode failed', e)),
 })
 ctx.registerCommand({
   id: 'live3d-refresh',
