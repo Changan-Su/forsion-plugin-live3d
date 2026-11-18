@@ -130,8 +130,8 @@ export function mountSettings(
     if (act === 'mode' && (input.value === 'idle' || input.value === 'always')) shell.setMode(input.value)
     else if (act === 'active') shell.setActive(input.value || null)
     else if (act === 'scene') shell.setRoom({ scene: input.value || null })
-    else if (act === 'saver-on') shell.setRoom({ saver: { ...shell.data().saver, enabled: (input as HTMLInputElement).checked } })
-    else if (act === 'saver-min') shell.setRoom({ saver: { ...shell.data().saver, minutes: Number(input.value) } })
+    else if (act === 'saver-on') shell.setRoom({ saver: { enabled: (input as HTMLInputElement).checked } })
+    else if (act === 'saver-min') shell.setRoom({ saver: { minutes: Number(input.value) } })
   }
   el.addEventListener('click', onClick)
   el.addEventListener('change', onChange)
