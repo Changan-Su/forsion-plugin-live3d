@@ -111,12 +111,48 @@ export function createShell(ctx: HostCtx): Shell {
   const lib = createLibrary(ctx, isPending)
   const scenes = createSceneLibrary(ctx)
 
+  // 存过却读不出来(宿主 2026-11-17 起 reject,code = 'plugin-data-unreadable':读错误 / 零字节 / 写到一半 / 被手改坏):
+  // 以前按缺省值接着用,下一次切模式 / 换形象 / 换场景就把缺省值整份写回去,用户原来的设置没了。
+  // 现在:本次运行里 `blocked`,一律不写盘;用户的改动照样生效但只在本次运行里(拒掉会让插件没法用),第一次改时说一声。
+  // 没存过(null)照旧用缺省;旧宿主读不出来也回 null,只能当没存过。其他 reject 维持原样(当没读到,照常保存)。
+  let loaded = false
+  let blocked = false
+  let sessionNoticeShown = false
+  const isDataUnreadable = (e: unknown): boolean =>
+    !!e && typeof e === 'object' && (e as { code?: unknown }).code === 'plugin-data-unreadable'
+
   const save = (): void => {
+    // 读还没回来:等读完再写(此时写 = 拿缺省值盖掉存着的那份)。用户的改动在 setter 那层已经等过了,这里只是兜底。
+    if (!loaded) {
+      void loadSettled.then(save)
+      return
+    }
+    if (blocked) return
     try {
       void ctx.saveData?.(data)?.catch?.(() => {})
     } catch {
       /* 旧宿主 / 写失败:内存里的值照用 */
     }
+  }
+  /** 用户亲手改的设置走这里:读不出来时照常生效(只在本次运行),第一次说一声不会保留。自动清理 / 导入完成走 save(),不出声。 */
+  const saveUserChange = (): void => {
+    if (blocked) {
+      if (!sessionNoticeShown) {
+        sessionNoticeShown = true
+        shell.say('warning', () => t('data.sessionOnly'))
+      }
+      return
+    }
+    save()
+  }
+  /** 读还没回来时用户就改了设置:等读完、在读回来的设置上再改一次(否则读回来那一下会把这次改动冲掉,
+   *  或者这次改动先落盘、把存着的整份盖成缺省 + 这一项)。返回 true = 已推迟。 */
+  const deferUntilLoaded = (fn: () => void): boolean => {
+    if (loaded) return false
+    void loadSettled.then(() => {
+      if (!disposed) fn()
+    })
+    return true
   }
 
   const emit = (): void => {
@@ -138,7 +174,7 @@ export function createShell(ctx: HostCtx): Shell {
     emit()
   })
 
-  const ready = Promise.resolve()
+  const loadSettled: Promise<void> = Promise.resolve()
     .then(() => ctx.loadData?.<Partial<Data>>())
     .then((v) => {
       if (!v || typeof v !== 'object') return
@@ -155,12 +191,21 @@ export function createShell(ctx: HostCtx): Shell {
         },
       }
     })
-    .catch(() => {})
-    .then(() => {
-      if (disposed) return
-      prunePending()
-      emit()
+    .catch((e: unknown) => {
+      if (!isDataUnreadable(e)) return
+      blocked = true
+      console.warn('[live3d] saved settings could not be read; saving is paused for this session', e)
+      // say():右上角通知 + 模型库顶部提示条(视图里看得见,不只一闪而过)
+      shell.say('warning', () => t('data.unreadable'))
     })
+    .then(() => {
+      loaded = true
+    })
+  const ready = loadSettled.then(() => {
+    if (disposed) return
+    prunePending()
+    emit()
+  })
 
   // ── 文件监听 ─────────────────────────────────────────────────────────────────
   // 盯「当前形象」与「待 agent 写好」的 live3d.json 的**内容变化**(watchFile 只报 change,新建不报 —— 新建靠下面的轮询)。
@@ -287,20 +332,23 @@ export function createShell(ctx: HostCtx): Shell {
     },
     setMode(mode) {
       if (mode !== 'idle' && mode !== 'always') return
+      if (deferUntilLoaded(() => shell.setMode(mode))) return
       if (data.mode === mode) return
       data.mode = mode
-      save()
+      saveUserChange()
       emit()
     },
     setActive(slug) {
+      if (deferUntilLoaded(() => shell.setActive(slug))) return
       const next = slug || null
       if (data.active === next) return
       data.active = next
-      save()
+      saveUserChange()
       syncWatch()
       emit()
     },
     setRoom(patch) {
+      if (deferUntilLoaded(() => shell.setRoom(patch))) return
       let changed = false
       if ('scene' in patch && patch.scene !== data.scene) {
         data.scene = patch.scene ?? null
@@ -318,7 +366,7 @@ export function createShell(ctx: HostCtx): Shell {
         }
       }
       if (!changed) return
-      save()
+      saveUserChange()
       syncWatch()
       emit()
     },
@@ -365,10 +413,11 @@ export function createShell(ctx: HostCtx): Shell {
       await Promise.all([lib.refresh(force), scenes.refresh(force)])
     },
     addPending(slug) {
+      if (deferUntilLoaded(() => shell.addPending(slug))) return
       data.pending[slug] = Date.now()
       seenPending.delete(slug)
       waitingModel.delete(slug)
-      save()
+      saveUserChange()
       syncWatch()
       emit()
     },

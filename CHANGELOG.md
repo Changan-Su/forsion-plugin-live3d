@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-11-18
+
+- 保存的 Live3D 设置(显示模式、Desk 默认形象、小屋场景 / 昼夜、屏保)读不出来时(文件读出错、是空的、写到一半或被手改坏),先停用保存、提示一次:以前会按缺省设置接着用,下一次切模式 / 换形象 / 换场景就把原来的整份设置盖掉。这次运行里照样能切、能换,只是不保存,第一次改时会说一声;下次启动重新读。没存过时照旧用缺省设置。需要 2026-11-17 之后的 Forsion(更早的版本读不出来时仍当没存过)。
+  When the saved Live3D settings (display mode, default Desk companion, room scene and time of day, screensaver) can't be read (a read error, an empty file, a write cut off halfway, or a hand edit that broke it), saving is paused and you're told once. Before, the plugin carried on with the defaults and the next mode, companion or scene change overwrote all of your saved settings. You can still switch and change things for this run; they just aren't saved, and the first change says so. The next start reads the file again. With nothing saved yet the defaults apply as before. Needs a Forsion build from 2026-11-17 or later (earlier builds still treat unreadable data as never saved).
+- 设置还没读回来就切了模式 / 换了形象,现在等读完再改、再保存,不会只存下缺省值加这一项。
+  A change made before the saved settings have loaded now waits for them, instead of saving the defaults plus that one change.
+
 ## 0.3.0 — 2026-10-04
 
 - **语音通话对口型**:和 Agent 打语音电话时,形象的嘴跟着它真实的声音开合(响的音节张大、音节之间合上),不再是一动不动;你说完、它还没开口时抬眼想一想。Desk 形象、3D 小屋和屏保都生效。按最近几秒的响度自动归一,换音色、调音量不用自己校。

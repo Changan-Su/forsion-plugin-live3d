@@ -2,7 +2,7 @@
   "id": "live3d",
   "name": "Live3D",
   "nameEn": "Live3D",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "apiVersion": 1,
   "minAppVersion": "2.11.2",
   "description": "在 Tangu 聊天右侧的 Agent Desk 里放一个 3D 形象(VRM 0.x / 1.0、GLB、glTF、FBX、OBJ),跟着 Agent 的状态做反应:思考时抬眼琢磨,说话时口型随输出一张一合(语音通话时跟着真实的声音对口型),调工具时低头干活,等你回应时蹦一下,出错时垂头,完成时庆祝。两种显示模式:空闲显示(Desk 上没有文件时出现)与总是显示(完全替换 Desk 的文件展示)。常见格式直接导入,插件自动分析并生成配置;PMX、压缩包、压缩过的模型交给随包的 Live3D Importer Agent 协助转换。没导入模型时显示一个会做表情的小球。左侧功能条的「3D 小屋」Space 是一间三面剖开的小房间:形象住在里面自己过日子,Agent 干活时它去书桌前陪着干;场景(scene.json)可以自己写。还有可选的全屏屏保。全部离线渲染。暂不支持 Live2D(授权原因)。",
