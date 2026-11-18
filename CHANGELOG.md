@@ -2,8 +2,8 @@
 
 ## 0.3.1 — 2026-11-18
 
-- 保存的 Live3D 设置(显示模式、Desk 默认形象、小屋场景 / 昼夜、屏保)读不出来时(文件读出错、是空的、写到一半或被手改坏),先停用保存、提示一次:以前会按缺省设置接着用,下一次切模式 / 换形象 / 换场景就把原来的整份设置盖掉。这次运行里照样能切、能换,只是不保存,第一次改时会说一声;下次启动重新读。没存过时照旧用缺省设置。需要 2026-11-17 之后的 Forsion(更早的版本读不出来时仍当没存过)。
-  When the saved Live3D settings (display mode, default Desk companion, room scene and time of day, screensaver) can't be read (a read error, an empty file, a write cut off halfway, or a hand edit that broke it), saving is paused and you're told once. Before, the plugin carried on with the defaults and the next mode, companion or scene change overwrote all of your saved settings. You can still switch and change things for this run; they just aren't saved, and the first change says so. The next start reads the file again. With nothing saved yet the defaults apply as before. Needs a Forsion build from 2026-11-17 or later (earlier builds still treat unreadable data as never saved).
+- 保存的 Live3D 设置(显示模式、Desk 默认形象、小屋场景 / 昼夜、屏保)读不出来时(文件读出错、是空的、写到一半或被手改坏),先停用保存、提示一次:以前会按缺省设置接着用,下一次切模式 / 换形象 / 换场景就把原来的整份设置盖掉。这次运行里照样能切、能换,只是不保存,第一次改时会说一声;下次启动重新读。没存过时照旧用缺省设置。需要 2.14.2 之后的 Forsion(更早的版本读不出来时仍当没存过)。
+  When the saved Live3D settings (display mode, default Desk companion, room scene and time of day, screensaver) can't be read (a read error, an empty file, a write cut off halfway, or a hand edit that broke it), saving is paused and you're told once. Before, the plugin carried on with the defaults and the next mode, companion or scene change overwrote all of your saved settings. You can still switch and change things for this run; they just aren't saved, and the first change says so. The next start reads the file again. With nothing saved yet the defaults apply as before. Needs Forsion newer than 2.14.2 (earlier versions still treat unreadable data as never saved).
 - 设置还没读回来就切了模式 / 换了形象,现在等读完再改、再保存,不会只存下缺省值加这一项。
   A change made before the saved settings have loaded now waits for them, instead of saving the defaults plus that one change.
 
