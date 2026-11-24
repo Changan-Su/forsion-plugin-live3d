@@ -45,7 +45,7 @@
   color: var(--text, #222);
   background: color-mix(in srgb, var(--bg-card, #fff) 88%, transparent);
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
 }
 .l3-tb-select {
@@ -82,7 +82,7 @@
   color: var(--text, #222);
   background: var(--bg-card, #fff);
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -139,7 +139,7 @@
   align-items: flex-start;
   padding: 10px 12px;
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .l3-radio.is-on {
@@ -169,7 +169,7 @@
   margin-bottom: 10px;
   padding: 8px 12px;
   font-size: 12.5px;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-md);
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.12));
   background: var(--bg-card, #fff);
 }
@@ -206,7 +206,7 @@
   margin-top: 12px;
   padding: 10px 12px;
   font-size: 12px;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-md);
   border: var(--border-width, 1px) dashed color-mix(in srgb, var(--danger, #d64545) 45%, transparent);
 }
 .l3-problems-title {
@@ -239,7 +239,7 @@
   color: var(--text, #222);
   background: var(--bg-card, #fff);
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-sm);
 }
 .l3-folder {
   display: flex;
@@ -247,7 +247,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md);
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.12));
 }
 .l3-folder-text {
@@ -306,7 +306,7 @@
   color: inherit;
   background: transparent;
   border: var(--border-width, 1px) solid transparent;
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .l3-item:hover {
@@ -324,7 +324,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-sm);
   background: var(--overlay-light, rgba(0, 0, 0, 0.04));
 }
 .l3-thumb img {
@@ -366,7 +366,7 @@
   font-size: 10.5px;
   font-weight: 600;
   color: var(--accent, #8b7fd6);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent, #8b7fd6) 12%, transparent);
 }
 .l3-side-actions {
@@ -392,7 +392,7 @@
   position: relative;
   flex: 1 0 320px;
   min-height: 320px;
-  border-radius: var(--radius-lg, 16px);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.1));
   background:
@@ -415,7 +415,7 @@
   color: var(--text-muted, #666);
   background: color-mix(in srgb, var(--bg-card, #fff) 90%, transparent);
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.1));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   pointer-events: none;
 }
 .l3-stage-msg[hidden] {
@@ -440,7 +440,7 @@
   color: var(--text, #222);
   background: transparent;
   border: var(--border-width, 1px) solid var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
 }
 .l3-chip.is-on {
@@ -473,7 +473,7 @@
   padding: 8px 10px;
   font-size: 12px;
   color: var(--text-muted, #666);
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--radius-md);
   background: var(--overlay-light, rgba(0, 0, 0, 0.04));
 }
 .l3-drop {
@@ -487,7 +487,7 @@
   font-weight: 600;
   color: var(--accent, #8b7fd6);
   border: 2px dashed var(--accent, #8b7fd6);
-  border-radius: var(--radius-lg, 16px);
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--bg-card, #fff) 85%, transparent);
   pointer-events: none;
 }
@@ -593,7 +593,7 @@
   gap: 2px;
   max-width: 46%;
   padding: 8px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: rgba(10, 14, 30, 0.46);
   color: #f4f6ff;
   pointer-events: auto;
@@ -622,7 +622,7 @@
   color: #eef1ff;
   background: rgba(10, 14, 30, 0.46);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 .l3-room-tools .l3-btn[data-primary] {
   color: var(--on-accent, #fff);
@@ -657,7 +657,7 @@
   color: rgba(238, 241, 255, 0.82);
   background: transparent;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
 }
 .l3-seg-btn.is-on {
@@ -689,7 +689,7 @@
   white-space: nowrap;
   color: #eef1ff;
   background: rgba(10, 14, 30, 0.46);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   pointer-events: none;
   transition: opacity 0.6s ease;
 }
